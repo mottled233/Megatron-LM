@@ -23,6 +23,7 @@ from megatron import get_args
 from megatron import mpu
 from megatron.mpu import LayerNorm
 from megatron.module import MegatronModule
+from megatron.checkpointing import get_checkpoint_version
 from megatron.model.fused_softmax import FusedScaleMaskSoftmax
 from megatron.model.fused_bias_gelu import bias_gelu_impl
 from megatron.model.utils import openai_gelu, erf_gelu
@@ -156,6 +157,7 @@ class ParallelSelfAttention(MegatronModule):
         self.scale_mask_softmax = FusedScaleMaskSoftmax(
             self.fp16,
             args.scaled_upper_triang_masked_softmax_fusion,
+            args.scaled_masked_softmax_fusion,
             self.attention_mask_func,
             self.attention_softmax_in_fp32,
             coeff)
@@ -174,10 +176,39 @@ class ParallelSelfAttention(MegatronModule):
             init_method=output_layer_init_method,
             skip_bias_add=True)
 
+    def _transpose_last_dim(self, mixed_layer, num_splits, num_splits_first):
+        input_shape = mixed_layer.size();
+        if num_splits_first:
+            """[s, b, num_splits * np * hn] 
+            -->(view) [s, b, num_splits, np, hn] 
+            -->(tranpose) [s, b, np, num_splits, hn] 
+            -->(view) [s, b, np * num_splits * hn] """
+
+            intermediate_shape = input_shape[:-1] +\
+                (num_splits, self.num_attention_heads_per_partition,
+                 self.hidden_size_per_attention_head)
+
+            mixed_layer = mixed_layer.view(*intermediate_shape)
+            mixed_layer = mixed_layer.transpose(-2, -3).contiguous()
+        else:
+            """[s, b, np * hn * num_splits] 
+            -->(view) [s, b, np, hn, num_splits] 
+            -->(tranpose) [s, b, np, num_splits, hn] 
+            -->(view) [s, b, np * num_splits * hn] """
+
+            intermediate_shape = input_shape[:-1] +\
+                (self.num_attention_heads_per_partition,
+                 self.hidden_size_per_attention_head, num_splits)
+
+            mixed_layer = mixed_layer.view(*intermediate_shape)
+            mixed_layer = mixed_layer.transpose(-1, -2).contiguous()
+        mixed_layer = mixed_layer.view(*input_shape)
+
+        return mixed_layer
 
     def forward(self, hidden_states, attention_mask, layer_past=None,
                 get_key_value=False):
-        # hidden_states: [s, b, h]
+        # hidden_states: [sq, b, h]
 
         # =====================
         # Query, Key, and Value
@@ -187,17 +218,25 @@ class ParallelSelfAttention(MegatronModule):
         # 没有经过结果收集
         mixed_x_layer, _ = self.query_key_value(hidden_states)
 
-        # [s, b, 3 * hp] --> [s, b, np, 3 * hn]  
+        checkpoint_version = get_checkpoint_version()
+        if checkpoint_version is not None:
+           if checkpoint_version == 0:
+               # [s, b, (3 * np * hn)] --> [s, b, (np * 3 * hn)]
+               mixed_x_layer = self._transpose_last_dim(mixed_x_layer, 3, True)
+           elif checkpoint_version == 1.0:
+               # [s, b, (np * hn * 3)] --> [s, b, (np * 3 * hn)]
+               mixed_x_layer = self._transpose_last_dim(mixed_x_layer, 3, False)
+
+        # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
         new_tensor_shape = mixed_x_layer.size()[:-1] + \
             (self.num_attention_heads_per_partition,
              3 * self.hidden_size_per_attention_head)
         mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
 
-        # [s, b, np, 3 * hn] --> 3 [s, b, np, hn]
+        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
         (query_layer,
          key_layer,
          value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3)
-
 
         # ==================================
         # Adjust key and value for inference
@@ -217,19 +256,19 @@ class ParallelSelfAttention(MegatronModule):
         # Raw attention scores. [b, np, s, s]
         # ===================================
         
-        # [b, np, s, s]
+        # [b, np, sq, sk]
         output_size = (query_layer.size(1), 
                        query_layer.size(2), 
                        query_layer.size(0), 
                        key_layer.size(0))
         
-        # [s, b, np, hn] -> [s, b * np, hn]
+        # [sq, b, np, hn] -> [sq, b * np, hn]
         query_layer = query_layer.view(output_size[2],
                                        output_size[0] * output_size[1], -1)
         key_layer = key_layer.view(output_size[3],
                                    output_size[0] * output_size[1], -1)
 
-        # preallocting result tensor: [b * np, s, s]
+        # preallocting result tensor: [b * np, sq, sk]
         matmul_result = torch.empty(
             output_size[0]*output_size[1], 
             output_size[2], 
@@ -237,18 +276,18 @@ class ParallelSelfAttention(MegatronModule):
             dtype=query_layer.dtype, 
             device=torch.cuda.current_device())
 
-        # Raw attention scores. [b * np, s, s]
+        # Raw attention scores. [b * np, sq, sk]
         matmul_result = torch.baddbmm(matmul_result, 
-            query_layer.transpose(0, 1),   # [b * np, s, hn]
-            key_layer.transpose(0,1).transpose(1, 2),  #[b * np, hn, s]
+            query_layer.transpose(0, 1),   # [b * np, sq, hn]
+            key_layer.transpose(0,1).transpose(1, 2),  #[b * np, hn, sk]
             beta=0.0, alpha=(1.0/self.norm_factor))
 
-        # change view to [b, np, s, s]
+        # change view to [b, np, sq, sk]
         attention_scores = matmul_result.view(*output_size)
 
 
         # ==================================================
-        # Update attention mask for inference. [b, np, s, s]
+        # Update attention mask for inference. [b, np, sq, sk]
         # ==================================================
 
         if get_key_value:
@@ -269,7 +308,7 @@ class ParallelSelfAttention(MegatronModule):
         # Attention probs and dropout
         # ===========================
 
-        # attention scores and attention mask [b, np, s, s]
+        # attention scores and attention mask [b, np, sq, sk]
         attention_probs = self.scale_mask_softmax(attention_scores,
                                                   attention_mask)
 
@@ -280,43 +319,43 @@ class ParallelSelfAttention(MegatronModule):
 
 
         # =========================
-        # Context layer. [s, b, hp]
+        # Context layer. [sq, b, hp]
         # =========================
 
-                # value_layer -> context layer.
-        # [s, b, np, hn] --> [b, np, s, hn]
+        # value_layer -> context layer.
+        # [sk, b, np, hn] --> [b, np, sq, hn]
 
-        # context layer shape: [b, np, s, hn]
+        # context layer shape: [b, np, sq, hn]
         output_size = (value_layer.size(1), 
                        value_layer.size(2), 
-                       value_layer.size(0), 
+                       query_layer.size(0),
                        value_layer.size(3)) 
 
-        # change view [s, b * np, hn] 
-        value_layer = value_layer.view(output_size[2],
+        # change view [sk, b * np, hn]
+        value_layer = value_layer.view(value_layer.size(0),
                                        output_size[0] * output_size[1], -1)
         
-        # change view [b * np, s, s]
+        # change view [b * np, sq, sk]
         attention_probs = attention_probs.view(output_size[0] * output_size[1],
                                                output_size[2], -1)
         
-        # matmul: [b * np, s, hn]
+        # matmul: [b * np, sq, hn]
         context_layer = torch.bmm(attention_probs, value_layer.transpose(0,1))
 
-        # change view [b, np, s, hn]
+        # change view [b, np, sq, hn]
         context_layer = context_layer.view(*output_size)
 
-        # [b, np, s, hn] --> [s, b, np, hn]
+        # [b, np, sq, hn] --> [sq, b, np, hn]
         context_layer = context_layer.permute(2, 0, 1, 3).contiguous()
 
-        # [s, b, np, hn] --> [s, b, hp]
+        # [sq, b, np, hn] --> [sq, b, hp]
         new_context_layer_shape = context_layer.size()[:-2] + \
             (self.hidden_size_per_partition,)
         context_layer = context_layer.view(*new_context_layer_shape)
 
 
         # =================
-        # Output. [s, b, h]
+        # Output. [sq, b, h]
         # =================
 
         output, bias = self.dense(context_layer)
