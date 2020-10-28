@@ -89,6 +89,7 @@ def _initialize_distributed():
     """Initialize torch.distributed and mpu."""
     args = get_args()
 
+    # 这里会根据环境变量的配置，可能返回与实际卡数不同
     device_count = torch.cuda.device_count()
     if torch.distributed.is_initialized():
 

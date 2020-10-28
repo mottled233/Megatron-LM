@@ -122,6 +122,7 @@ class ParallelSelfAttention(MegatronModule):
         self.fp16 = args.fp16
 
         self.attention_mask_func = attention_mask_func
+        # TODO：为什么要缩放？好像是精度问题？
         self.apply_query_key_layer_scaling = args.apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = args.attention_softmax_in_fp32
         if self.apply_query_key_layer_scaling:
@@ -138,10 +139,11 @@ class ParallelSelfAttention(MegatronModule):
             args.num_attention_heads, world_size)
 
         # Strided linear layer.
+        # 沿batch维度切割打散
         self.query_key_value = mpu.ColumnParallelLinear(
             args.hidden_size,
             3 * args.hidden_size,
-            gather_output=False,
+            gather_output=False,  # 返回的结果在每个节点上只有自己的局部分区结果
             init_method=init_method)
 
         coeff = None
@@ -150,6 +152,7 @@ class ParallelSelfAttention(MegatronModule):
             coeff = self.layer_number
             self.norm_factor *= coeff
 
+        # 混合精度并进行了scale的softmax
         self.scale_mask_softmax = FusedScaleMaskSoftmax(
             self.fp16,
             args.scaled_upper_triang_masked_softmax_fusion,
@@ -163,6 +166,7 @@ class ParallelSelfAttention(MegatronModule):
         self.attention_dropout = torch.nn.Dropout(args.attention_dropout)
 
         # Output.
+        # 按最后的维度进行的切割，并进行reduce
         self.dense = mpu.RowParallelLinear(
             args.hidden_size,
             args.hidden_size,
@@ -180,6 +184,7 @@ class ParallelSelfAttention(MegatronModule):
         # =====================
 
         # Attention heads [s, b, hp] --> [s, b, 3 * hp]
+        # 没有经过结果收集
         mixed_x_layer, _ = self.query_key_value(hidden_states)
 
         # [s, b, 3 * hp] --> [s, b, np, 3 * hn]  
@@ -411,6 +416,7 @@ class ParallelTransformerLayer(MegatronModule):
         # trigerring the fusion kernel. For now, we use two 
         # different nn.functional routines to account for varying
         # dropout semantics during training and inference phases.
+        # TODO: 没看懂为什么这么搞，大概是jit脚本不支持根据self.training进行切换
         if self.bias_dropout_fusion:
             if self.training:
                 bias_dropout_add_func = bias_dropout_add_fused_train

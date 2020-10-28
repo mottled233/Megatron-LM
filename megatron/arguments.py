@@ -52,6 +52,7 @@ def parse_args(extra_args_provider=None, defaults={},
         args = parser.parse_args()
 
     # Distributed args.
+    # 这里是因为使用torch.distribute.launch启动，会通过环境变量方式传入这些参数
     args.rank = int(os.getenv('RANK', '0'))
     args.world_size = int(os.getenv("WORLD_SIZE", '1'))
     args.model_parallel_size = min(args.model_parallel_size, args.world_size)

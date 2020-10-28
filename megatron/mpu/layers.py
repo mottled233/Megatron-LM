@@ -54,7 +54,8 @@ def _initialize_affine_weight_gpu(weight, init_method,
     weight.model_parallel = True
     weight.partition_dim = partition_dim
     weight.partition_stride = stride
-    
+
+    # TODO 应该是从这里进入了多进程
     with get_cuda_rng_tracker().fork():
         init_method(weight)
 

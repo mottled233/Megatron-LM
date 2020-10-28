@@ -72,6 +72,7 @@ def initialize_model_parallel(model_parallel_size_):
     for i in range(model_parallel_size):
         ranks = range(i, world_size, model_parallel_size)
         group = torch.distributed.new_group(ranks)
+        # 让每一个进程只属于自己的dp group
         if i == (rank % model_parallel_size):
             _DATA_PARALLEL_GROUP = group
 
