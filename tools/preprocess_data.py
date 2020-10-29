@@ -148,7 +148,7 @@ def main():
     # fin = open(args.input, 'r', encoding='utf-8')
     print("setup...")
     if nltk_available and args.split_sentences:
-        nltk.download("punkt", download_dir="tokenizers/punkt/english.pickle", quiet=True)
+        nltk.download("punkt", download_dir="./", quiet=True)
 
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
