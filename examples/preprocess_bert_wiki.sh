@@ -5,7 +5,7 @@ INPUT_DIR=
 OUTPUT_PREFIX=
 NUM_OF_WORKER=16
 
-python preprocess_data.py \
+python tools\preprocess_data.py \
        --input $INPUT_DIR \
        --json-keys text \
        --split-sentences \
