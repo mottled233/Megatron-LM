@@ -146,12 +146,13 @@ def main():
 
     # print("Opening", args.input)
     # fin = open(args.input, 'r', encoding='utf-8')
-
+    print("setup...")
     if nltk_available and args.split_sentences:
-        nltk.download("punkt", quiet=True)
+        nltk.download("punkt", download_dir="tokenizers/punkt/english.pickle", quiet=True)
 
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
+    print("initializing process pool...")
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
     encoded_docs = []
     for parent, dirnames, filenames in os.walk(args.input):
