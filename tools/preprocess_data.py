@@ -144,8 +144,8 @@ def main():
     args = get_args()
     startup_start = time.time()
 
-    print("Opening", args.input)
-    fin = open(args.input, 'r', encoding='utf-8')
+    # print("Opening", args.input)
+    # fin = open(args.input, 'r', encoding='utf-8')
 
     if nltk_available and args.split_sentences:
         nltk.download("punkt", quiet=True)
@@ -153,7 +153,17 @@ def main():
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
-    encoded_docs = pool.imap(encoder.encode, fin, 25)
+    encoded_docs = []
+    for parent, dirnames, filenames in os.walk(args.input):
+        for filename in filenames:
+            current = os.path.join(parent, filename)
+            print("Opening", args.input)
+            fin = open(current, 'r', encoding='utf-8')
+
+            encoded_docs.extend(pool.imap(encoder.encode, fin, 25))
+            fin.close()
+    pool.close()
+    # encoded_docs = pool.imap(encoder.encode, fin, 25)
     #encoded_docs = map(encoder.encode, fin)
 
     level = "document"
