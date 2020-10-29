@@ -1,8 +1,8 @@
 #!/bin/bash
 
 VOCAB_FILE=bert-vocab.txt
-INPUT_DIR=
-OUTPUT_PREFIX=
+INPUT_DIR=/cfs/aidenliang/corpus/wiki_data/text/AA
+OUTPUT_PREFIX=/cfs/aidenliang/corpus/wiki_data/db/wiki
 NUM_OF_WORKER=16
 
 python tools\preprocess_data.py \
