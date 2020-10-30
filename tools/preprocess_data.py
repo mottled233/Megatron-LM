@@ -155,14 +155,16 @@ def main():
     print("initializing process pool...")
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
     encoded_docs = []
-    for parent, dirnames, filenames in os.walk(args.input):
-        for filename in filenames:
-            current = os.path.join(parent, filename)
-            print("Opening", current)
-            fin = open(current, 'r', encoding='utf-8')
+    inputs = args.input.split(";")
+    for input_dir in inputs:
+        for parent, dirnames, filenames in os.walk(input_dir):
+            for filename in filenames:
+                current = os.path.join(parent, filename)
+                print("Opening", current)
+                fin = open(current, 'r', encoding='utf-8')
 
-            encoded_docs.extend(pool.imap(encoder.encode, fin, 25))
-            fin.close()
+                encoded_docs.extend(pool.imap(encoder.encode, fin, 25))
+                fin.close()
     pool.close()
     # encoded_docs = pool.imap(encoder.encode, fin, 25)
     #encoded_docs = map(encoder.encode, fin)
