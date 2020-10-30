@@ -9,7 +9,7 @@ python tools/preprocess_data.py \
        --input $INPUT_DIR \
        --json-keys text \
        --split-sentences \
-       --tokenizer-type BertWordPieceCase \
+       --tokenizer-type BertWordPieceLowerCase \
        --vocab-file $VOCAB_FILE \
        --output-prefix $OUTPUT_PREFIX \
        --workers $NUM_OF_WORKER

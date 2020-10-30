@@ -147,8 +147,8 @@ def main():
     # print("Opening", args.input)
     # fin = open(args.input, 'r', encoding='utf-8')
     print("setup...")
-    if nltk_available and args.split_sentences:
-        nltk.download("punkt", download_dir="./", quiet=True)
+    # if nltk_available and args.split_sentences:
+    #     nltk.download("punkt", download_dir="./", quiet=True)
 
     encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
@@ -158,7 +158,7 @@ def main():
     for parent, dirnames, filenames in os.walk(args.input):
         for filename in filenames:
             current = os.path.join(parent, filename)
-            print("Opening", args.input)
+            print("Opening", current)
             fin = open(current, 'r', encoding='utf-8')
 
             encoded_docs.extend(pool.imap(encoder.encode, fin, 25))
