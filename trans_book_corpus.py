@@ -42,7 +42,7 @@ def main():
             json_data = {args.json_key: file}
             buff.append(json.dumps(json_data))
             count += 1
-            if count != 0 and count % args.log_step:
+            if count != 0 and count % args.log_step == 0:
                 print(f"{count} books handled...")
 
             if len(buff) % args.buff_file == 0:
