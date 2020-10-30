@@ -19,6 +19,7 @@ from datetime import datetime
 import math
 import sys
 import torch
+import os
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from apex.optimizers import FusedAdam as Adam
 
@@ -332,6 +333,7 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
     def add_to_logging(name):
         if name in timers.timers:
             timers_to_log.append(name)
+
     add_to_logging('forward')
     add_to_logging('backward')
     add_to_logging('backward-backward')
@@ -406,6 +408,8 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     timers('interval time').start()
     report_memory_flag = True
     while iteration < args.train_iters:
+        if os.path.isfile("stop_signal"):
+            sys.exit()
         loss_dict, skipped_iter = train_step(forward_step_func,
                                              train_data_iterator,
                                              model,
