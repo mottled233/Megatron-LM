@@ -155,7 +155,7 @@ def main():
     print("initializing process pool...")
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
     encoded_docs = []
-    inputs = args.input.split(";")
+    inputs = args.input.split("@")
     for input_dir in inputs:
         for parent, dirnames, filenames in os.walk(input_dir):
             for filename in filenames:
