@@ -14,7 +14,7 @@ def parse_args():
                        help='Skip the first n lines')
     group.add_argument('--remove-empty-lines', type=bool, default=True)
     group.add_argument('--json-key', type=str, default="text")
-    group.add_argument('--log-step', type=int, default=1000)
+    group.add_argument('--log-step', type=int, default=100)
     group.add_argument('--buff_file', type=int, default=1000)
     args = parser.parse_args()
     return args
@@ -33,7 +33,7 @@ def main():
                 lines = f1.readlines()
             file = ""
             for idx, line in enumerate(lines):
-                if idx < args.remove_head_lines:
+                if idx < args.remove_lines:
                     continue
                 if args.remove_empty_lines and line == "\n":
                     continue
