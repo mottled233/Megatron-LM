@@ -1,6 +1,7 @@
 import json
 import os
 import argparse
+from tqdm import tqdm
 
 
 def parse_args():
@@ -26,7 +27,7 @@ def main():
     file_count = 0
     count = 0
     buff = []
-    for parent, dirnames, filenames in os.walk(args.input):
+    for parent, dirnames, filenames in tqdm(os.walk(args.input)):
         for filename in filenames:
             current = os.path.join(parent, filename)
             with open(current, 'r', encoding='utf-8') as f1:
