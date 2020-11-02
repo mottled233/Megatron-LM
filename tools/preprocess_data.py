@@ -159,17 +159,27 @@ def main():
     encoded_docs = []
     inputs = args.input.split("@")
 
+    buff_size = args.doc_of_workers * args.workers
+    buff_docs = []
+    buff_file_num = 0
+    proc_start = time.time()
     for input_dir in inputs:
         for parent, dirnames, filenames in os.walk(input_dir):
             for filename in filenames:
-                proc_start = time.time()
                 current = os.path.join(parent, filename)
                 print("Opening", current)
                 fin = open(current, 'r', encoding='utf-8')
-
-                encoded_docs.extend(pool.imap(encoder.encode, fin, args.doc_of_workers))
-                print(f"Finished {current} , use time:{time.time()-proc_start}")
+                buff_docs.extend(fin.readlines())
                 fin.close()
+                buff_file_num += 1
+
+                if len(buff_docs) >= buff_size:
+                    encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
+                    time_per_file = (time.time()-proc_start)/buff_file_num
+                    print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
+                    proc_start = time.time()
+                    buff_file_num = 0
+                    buff_docs = []
     pool.close()
     # encoded_docs = pool.imap(encoder.encode, fin, 25)
     #encoded_docs = map(encoder.encode, fin)
