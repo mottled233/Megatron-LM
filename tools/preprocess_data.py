@@ -166,8 +166,9 @@ def main():
                 current = os.path.join(parent, filename)
                 print("Opening", current)
                 fin = open(current, 'r', encoding='utf-8')
+
+                encoded_docs.extend(pool.imap(encoder.encode, fin, args.doc_of_workers))
                 print(f"Finished {current} , use time:{time.time()-proc_start}")
-                encoded_docs.extend(pool.imap(encoder.encode, fin, 25))
                 fin.close()
     pool.close()
     # encoded_docs = pool.imap(encoder.encode, fin, 25)
