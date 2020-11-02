@@ -124,6 +124,8 @@ def get_args():
     group = parser.add_argument_group(title='runtime')
     group.add_argument('--workers', type=int, default=1,
                        help='Number of worker processes to launch')
+    group.add_argument('--doc-of-workers', type=int, default=25,
+                       help='Number of document per worker to processes')
     group.add_argument('--log-interval', type=int, default=100,
                        help='Interval between progress updates')
     args = parser.parse_args()
