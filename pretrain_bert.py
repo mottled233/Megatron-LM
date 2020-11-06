@@ -66,7 +66,7 @@ def get_batch(data_iterator):
     return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask
 
 
-def forward_step(data_iterator, model, iteration):
+def forward_step(data_iterator, model, iteration=0):
     """Forward step."""
     args = get_args()
     timers = get_timers()
