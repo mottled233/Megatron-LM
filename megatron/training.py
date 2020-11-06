@@ -425,41 +425,41 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
         if iteration % args.grad_acc_step == 0:
             global_iteration += 1
 
-        # Logging.
-        loss_scale = None
-        if args.fp16:
-            loss_scale = optimizer.loss_scale
-        report_memory_flag = training_log(loss_dict, total_loss_dict,
-                                          optimizer.param_groups[0]['lr'],
-                                          global_iteration, loss_scale,
-                                          report_memory_flag, skipped_iter)
+            # Logging.
+            loss_scale = None
+            if args.fp16:
+                loss_scale = optimizer.loss_scale
+            report_memory_flag = training_log(loss_dict, total_loss_dict,
+                                              optimizer.param_groups[0]['lr'],
+                                              global_iteration, loss_scale,
+                                              report_memory_flag, skipped_iter)
 
-        # Autoresume
-        if args.adlr_autoresume and \
-           (global_iteration % args.adlr_autoresume_interval == 0):
-            check_adlr_autoresume_termination(global_iteration, model, optimizer,
-                                              lr_scheduler)
+            # Autoresume
+            if args.adlr_autoresume and \
+               (global_iteration % args.adlr_autoresume_interval == 0):
+                check_adlr_autoresume_termination(global_iteration, model, optimizer,
+                                                  lr_scheduler)
 
-        # Checkpointing
-        if args.save and args.save_interval and \
-           global_iteration % args.save_interval == 0:
-            save_checkpoint(global_iteration, model, optimizer, lr_scheduler)
+            # Checkpointing
+            if args.save and args.save_interval and \
+               global_iteration % args.save_interval == 0:
+                save_checkpoint(global_iteration, model, optimizer, lr_scheduler)
 
-        # Evaluation
-        if args.eval_interval and global_iteration % args.eval_interval == 0 and \
-           args.do_valid:
-            prefix = 'iteration {}'.format(global_iteration)
-            evaluate_and_print_results(prefix, forward_step_func,
-                                       valid_data_iterator, model,
-                                       global_iteration, False)
+            # Evaluation
+            if args.eval_interval and global_iteration % args.eval_interval == 0 and \
+               args.do_valid:
+                prefix = 'iteration {}'.format(global_iteration)
+                evaluate_and_print_results(prefix, forward_step_func,
+                                           valid_data_iterator, model,
+                                           global_iteration, False)
 
-        if args.exit_interval and global_iteration % args.exit_interval == 0:
-            torch.distributed.barrier()
-            time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            rank = torch.distributed.get_rank()
-            print_rank_0('rank: {} | time: {} | exiting the program at '
-                         'iteration {}'.format(rank, time_str, global_iteration))
-            sys.exit()
+            if args.exit_interval and global_iteration % args.exit_interval == 0:
+                torch.distributed.barrier()
+                time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                rank = torch.distributed.get_rank()
+                print_rank_0('rank: {} | time: {} | exiting the program at '
+                             'iteration {}'.format(rank, time_str, global_iteration))
+                sys.exit()
 
     return global_iteration
 
