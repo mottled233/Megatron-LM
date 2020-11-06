@@ -119,6 +119,11 @@ def parse_args(extra_args_provider=None, defaults={},
             'for distribute-checkpointed-activations to work you '\
             'need to enable checkpoint-activations'
 
+    # Grad acc
+    if args.grad_acc_step > 1:
+        assert args.grad_accumulate, \
+            'for gradient accumulate you need enable grad-accumulate argument.'
+
     # load scaled_upper_triang_masked_softmax_fusion kernel
     if args.scaled_upper_triang_masked_softmax_fusion:
         fused_kernels.load_scaled_upper_triang_masked_softmax_fusion_kernel()
@@ -220,6 +225,11 @@ def _add_training_args(parser):
                        help='Batch size per model instance (local batch size). '
                        'Global batch size is local batch size times data '
                        'parallel size.')
+    group.add_argument('--grad-accumulate', action='store_true',
+                       help='Enable gradient accumulate for training '
+                       'with even bigger batch sizes.')
+    group.add_argument('--grad-acc-step', type=int, default=1,
+                       help='Update parameters after num of steps.')
     group.add_argument('--checkpoint-activations', action='store_true',
                        help='Checkpoint activation to allow for training '
                        'with larger models, sequences, and batch sizes.')

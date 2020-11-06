@@ -66,7 +66,7 @@ def get_batch(data_iterator):
     return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask
 
 
-def forward_step(data_iterator, model):
+def forward_step(data_iterator, model, iteration):
     """Forward step."""
     args = get_args()
     timers = get_timers()
@@ -78,6 +78,7 @@ def forward_step(data_iterator, model):
     timers('batch generator').stop()
 
     # Forward model. lm_labels
+    timers('forward-forward').start()
     lm_loss_, sop_logits = model(tokens, padding_mask,
                                  tokentype_ids=types,
                                  lm_labels=lm_labels)
@@ -85,13 +86,18 @@ def forward_step(data_iterator, model):
     sop_loss = F.cross_entropy(sop_logits.view(-1, 2).float(),
                                sentence_order.view(-1),
                                ignore_index=-1)
+    timers('forward-forward').stop()
 
     lm_loss = torch.sum(
         lm_loss_.view(-1) * loss_mask.reshape(-1)) / loss_mask.sum()
 
     loss = lm_loss + sop_loss
-
-    reduced_losses = reduce_losses([lm_loss, sop_loss])
+    timers('forward-reduce').start()
+    if not args.grad_accumulate or (iteration > 0 and iteration % args.grad_acc_step == 0):
+        reduced_losses = reduce_losses([lm_loss, sop_loss])
+    else:
+        reduced_losses = [lm_loss, sop_loss]
+    timers('forward-reduce').stop()
 
     return loss, {'lm loss': reduced_losses[0], 'sop loss': reduced_losses[1]}
 

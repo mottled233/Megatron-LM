@@ -232,7 +232,7 @@ def setup_model_and_optimizer(model_provider_func):
     return model, optimizer, lr_scheduler
 
 
-def backward_step(optimizer, model, loss):
+def backward_step(optimizer, model, loss, iteration):
     """Backward step."""
     args = get_args()
     timers = get_timers()
@@ -241,48 +241,51 @@ def backward_step(optimizer, model, loss):
     timers('backward-backward').start()
     optimizer.zero_grad(set_grads_to_None=True)
     if args.fp16:
+        # Scale loss to fp32 before backward
         optimizer.backward(loss, update_master_grads=False)
     else:
         loss.backward()
     timers('backward-backward').stop()
 
-    # All-reduce if needed.
-    if args.DDP_impl == 'local':
-        timers('backward-allreduce').start()
-        model.allreduce_params(reduce_after=False,
-                               fp32_allreduce=args.fp32_allreduce)
-        timers('backward-allreduce').stop()
+    # step backward
+    if not args.grad_accumulate or (iteration > 0 and iteration % args.grad_acc_step == 0):
+        # All-reduce if needed.
+        if args.DDP_impl == 'local':
+            timers('backward-allreduce').start()
+            model.allreduce_params(reduce_after=False,
+                                   fp32_allreduce=args.fp32_allreduce)
+            timers('backward-allreduce').stop()
 
-    # Update master gradients.
-    timers('backward-master-grad').start()
-    if args.fp16:
-        optimizer.update_master_grads()
-    timers('backward-master-grad').stop()
+        # Update master gradients.
+        timers('backward-master-grad').start()
+        if args.fp16:
+            optimizer.update_master_grads()
+        timers('backward-master-grad').stop()
 
-    # Clipping gradients helps prevent the exploding gradient.
-    timers('backward-clip-grad').start()
-    if args.clip_grad > 0:
-        if not args.fp16:
-            mpu.clip_grad_norm(model.parameters(), args.clip_grad)
-        else:
-            optimizer.clip_master_grads(args.clip_grad)
-    timers('backward-clip-grad').stop()
+        # Clipping gradients helps prevent the exploding gradient.
+        timers('backward-clip-grad').start()
+        if args.clip_grad > 0:
+            if not args.fp16:
+                mpu.clip_grad_norm(model.parameters(), args.clip_grad)
+            else:
+                optimizer.clip_master_grads(args.clip_grad)
+        timers('backward-clip-grad').stop()
 
 
 def train_step(forward_step_func, data_iterator,
-               model, optimizer, lr_scheduler):
+               model, optimizer, lr_scheduler, iteration):
     """Single training step."""
     args = get_args()
     timers = get_timers()
 
     # Forward model for one step.
     timers('forward').start()
-    loss, loss_reduced = forward_step_func(data_iterator, model)
+    loss, loss_reduced = forward_step_func(data_iterator, model, iteration)
     timers('forward').stop()
 
     # Calculate gradients, reduce across processes, and clip.
     timers('backward').start()
-    backward_step(optimizer, model, loss)
+    backward_step(optimizer, model, loss, iteration)
     timers('backward').stop()
 
     # Update parameters.
@@ -335,6 +338,8 @@ def training_log(loss_dict, total_loss_dict, learning_rate, iteration,
             timers_to_log.append(name)
 
     add_to_logging('forward')
+    add_to_logging('forward-forward')
+    add_to_logging('forward-reduce')
     add_to_logging('backward')
     add_to_logging('backward-backward')
     add_to_logging('backward-allreduce')
@@ -414,7 +419,8 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
                                              train_data_iterator,
                                              model,
                                              optimizer,
-                                             lr_scheduler)
+                                             lr_scheduler,
+                                             iteration)
         iteration += 1
 
         # Logging.
