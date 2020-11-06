@@ -408,11 +408,11 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     total_loss_dict = {}
 
     # Iterations.
-    iteration = args.iteration
-
+    global_iteration = args.iteration
+    iteration = global_iteration * args.grad_acc_step
     timers('interval time').start()
     report_memory_flag = True
-    while iteration < args.train_iters:
+    while global_iteration < args.train_iters:
         if os.path.isfile("stop_signal"):
             sys.exit()
         loss_dict, skipped_iter = train_step(forward_step_func,
@@ -422,6 +422,8 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
                                              lr_scheduler,
                                              iteration)
         iteration += 1
+        if iteration % args.grad_acc_step == 0:
+            global_iteration += 1
 
         # Logging.
         loss_scale = None
@@ -429,37 +431,37 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
             loss_scale = optimizer.loss_scale
         report_memory_flag = training_log(loss_dict, total_loss_dict,
                                           optimizer.param_groups[0]['lr'],
-                                          iteration, loss_scale,
+                                          global_iteration, loss_scale,
                                           report_memory_flag, skipped_iter)
 
         # Autoresume
         if args.adlr_autoresume and \
-           (iteration % args.adlr_autoresume_interval == 0):
-            check_adlr_autoresume_termination(iteration, model, optimizer,
+           (global_iteration % args.adlr_autoresume_interval == 0):
+            check_adlr_autoresume_termination(global_iteration, model, optimizer,
                                               lr_scheduler)
 
         # Checkpointing
         if args.save and args.save_interval and \
-           iteration % args.save_interval == 0:
-            save_checkpoint(iteration, model, optimizer, lr_scheduler)
+           global_iteration % args.save_interval == 0:
+            save_checkpoint(global_iteration, model, optimizer, lr_scheduler)
 
         # Evaluation
-        if args.eval_interval and iteration % args.eval_interval == 0 and \
+        if args.eval_interval and global_iteration % args.eval_interval == 0 and \
            args.do_valid:
-            prefix = 'iteration {}'.format(iteration)
+            prefix = 'iteration {}'.format(global_iteration)
             evaluate_and_print_results(prefix, forward_step_func,
                                        valid_data_iterator, model,
-                                       iteration, False)
+                                       global_iteration, False)
 
-        if args.exit_interval and iteration % args.exit_interval == 0:
+        if args.exit_interval and global_iteration % args.exit_interval == 0:
             torch.distributed.barrier()
             time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             rank = torch.distributed.get_rank()
             print_rank_0('rank: {} | time: {} | exiting the program at '
-                         'iteration {}'.format(rank, time_str, iteration))
+                         'iteration {}'.format(rank, time_str, global_iteration))
             sys.exit()
 
-    return iteration
+    return global_iteration
 
 
 def evaluate(forward_step_func, data_iterator, model, verbose=False):
