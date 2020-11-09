@@ -22,6 +22,7 @@ import torch
 import os
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from apex.optimizers import FusedAdam as Adam
+from apex.optimizers import FusedLAMB as LAMB
 
 from megatron import get_args
 from megatron import get_timers
@@ -164,9 +165,15 @@ def get_optimizer(model):
             if not hasattr(param, 'model_parallel'):
                 param.model_parallel = False
 
-    # Use Adam.
-    optimizer = Adam(param_groups, lr=args.lr, weight_decay=args.weight_decay,
-        betas=(args.adam_beta1, args.adam_beta2), eps=args.adam_eps)
+    if args.grad_accumulate:
+        # Use LABM
+        optimizer = LAMB(param_groups, lr=args.lr, bias_correction=True, betas=(args.adam_beta1, args.adam_beta2),
+                         eps=args.adam_eps, weight_decay=args.weight_decay, amsgrad=False,
+                         adam_w_mode=True, grad_averaging=True, set_grad_none=True, max_grad_norm=1.0)
+    else:
+        # Use Adam.
+        optimizer = Adam(param_groups, lr=args.lr, weight_decay=args.weight_decay,
+                         betas=(args.adam_beta1, args.adam_beta2), eps=args.adam_eps)
 
     # Wrap into fp16 optimizer.
     if args.fp16:
