@@ -283,6 +283,7 @@ def train_step(forward_step_func, data_iterator,
     # Forward model for one step.
     timers('forward').start()
     loss, loss_reduced = forward_step_func(data_iterator, model, iteration)
+    loss /= args.grad_acc_step
     timers('forward').stop()
 
     # Calculate gradients, reduce across processes, and clip.
