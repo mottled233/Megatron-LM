@@ -305,7 +305,10 @@ def train_step(forward_step_func, data_iterator,
             skipped_iter = 1
 
         # 更新完毕，清空梯度
-        optimizer.zero_grad(set_grads_to_None=True)
+        if args.fp16:
+            optimizer.zero_grad(set_grads_to_None=True)
+        else:
+            optimizer.zero_grad()
     else:
         skipped_iter = 0
 
