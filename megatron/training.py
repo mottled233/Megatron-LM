@@ -238,8 +238,9 @@ def backward_step(optimizer, model, loss, iteration):
     timers = get_timers()
 
     # Backward pass.
+    # 在这里不清空梯度
     timers('backward-backward').start()
-    optimizer.zero_grad(set_grads_to_None=True)
+
     if args.fp16:
         # Scale loss to fp32 before backward
         optimizer.backward(loss, update_master_grads=False)
@@ -256,20 +257,21 @@ def backward_step(optimizer, model, loss, iteration):
                                    fp32_allreduce=args.fp32_allreduce)
             timers('backward-allreduce').stop()
 
-        # Update master gradients.
-        timers('backward-master-grad').start()
-        if args.fp16:
-            optimizer.update_master_grads()
-        timers('backward-master-grad').stop()
+    # TODO：这里该不该进入if块？
+    # Update master gradients.
+    timers('backward-master-grad').start()
+    if args.fp16:
+        optimizer.update_master_grads()
+    timers('backward-master-grad').stop()
 
-        # Clipping gradients helps prevent the exploding gradient.
-        timers('backward-clip-grad').start()
-        if args.clip_grad > 0:
-            if not args.fp16:
-                mpu.clip_grad_norm(model.parameters(), args.clip_grad)
-            else:
-                optimizer.clip_master_grads(args.clip_grad)
-        timers('backward-clip-grad').stop()
+    # Clipping gradients helps prevent the exploding gradient.
+    timers('backward-clip-grad').start()
+    if args.clip_grad > 0:
+        if not args.fp16:
+            mpu.clip_grad_norm(model.parameters(), args.clip_grad)
+        else:
+            optimizer.clip_master_grads(args.clip_grad)
+    timers('backward-clip-grad').stop()
 
 
 def train_step(forward_step_func, data_iterator,
@@ -288,17 +290,24 @@ def train_step(forward_step_func, data_iterator,
     backward_step(optimizer, model, loss, iteration)
     timers('backward').stop()
 
-    # Update parameters.
-    timers('optimizer').start()
-    optimizer.step()
-    timers('optimizer').stop()
+    # 只有临界更新参数
+    if iteration % args.grad_acc_step == 0:
+        # Update parameters.
+        timers('optimizer').start()
+        optimizer.step()
+        timers('optimizer').stop()
 
-    # Update learning rate.
-    skipped_iter = 0
-    if not (args.fp16 and optimizer.overflow):
-        lr_scheduler.step()
+        # 在临界更新后检查是否溢出
+        skipped_iter = 0
+        if not (args.fp16 and optimizer.overflow):
+            lr_scheduler.step()
+        else:
+            skipped_iter = 1
+
+        # 更新完毕，清空梯度
+        optimizer.zero_grad(set_grads_to_None=True)
     else:
-        skipped_iter = 1
+        skipped_iter = 0
 
     return loss_reduced, skipped_iter
 
@@ -415,13 +424,14 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
     while global_iteration < args.train_iters:
         if os.path.isfile("stop_signal"):
             sys.exit()
+
+        iteration += 1
         loss_dict, skipped_iter = train_step(forward_step_func,
                                              train_data_iterator,
                                              model,
                                              optimizer,
                                              lr_scheduler,
                                              iteration)
-        iteration += 1
         if iteration % args.grad_acc_step == 0:
             global_iteration += 1
 
