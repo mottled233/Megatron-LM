@@ -304,6 +304,7 @@ def train_step(forward_step_func, data_iterator,
             lr_scheduler.step()
         else:
             skipped_iter = 1
+            print_rank_0()
 
         # 更新完毕，清空梯度
         if args.fp16:
@@ -443,7 +444,6 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
             loss_scale = None
             if args.fp16:
                 loss_scale = optimizer.loss_scale
-            print_rank_0(loss_dict)
             report_memory_flag = training_log(loss_dict, total_loss_dict,
                                               optimizer.param_groups[0]['lr'],
                                               global_iteration, loss_scale,

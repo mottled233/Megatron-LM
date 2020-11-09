@@ -93,10 +93,10 @@ def forward_step(data_iterator, model, iteration=0):
 
     loss = lm_loss + sop_loss
     timers('forward-reduce').start()
-    # if not args.grad_accumulate or (iteration > 0 and iteration % args.grad_acc_step == 0):
-    reduced_losses = reduce_losses([lm_loss, sop_loss])
-    # else:
-    #     reduced_losses = [lm_loss, sop_loss]
+    if not args.grad_accumulate or (iteration > 0 and iteration % args.grad_acc_step == 0):
+        reduced_losses = reduce_losses([lm_loss, sop_loss])
+    else:
+        reduced_losses = [lm_loss, sop_loss]
     timers('forward-reduce').stop()
 
     return loss, {'lm loss': reduced_losses[0], 'sop loss': reduced_losses[1]}
