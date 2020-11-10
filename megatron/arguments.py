@@ -18,6 +18,7 @@
 import argparse
 import os
 
+import deepspeed
 import torch
 from megatron import fused_kernels
 
@@ -41,6 +42,9 @@ def parse_args(extra_args_provider=None, defaults={},
     parser = _add_autoresume_args(parser)
     parser = _add_realm_args(parser)
 
+    # Include DeepSpeed configuration arguments
+    parser = deepspeed.add_config_arguments(parser)
+
     # Custom arguments.
     if extra_args_provider is not None:
         parser = extra_args_provider(parser)
@@ -51,6 +55,7 @@ def parse_args(extra_args_provider=None, defaults={},
     else:
         args = parser.parse_args()
 
+    args.cuda = torch.cuda.is_available()
     # Distributed args.
     # 这里是因为使用torch.distribute.launch启动，会通过环境变量方式传入这些参数
     args.rank = int(os.getenv('RANK', '0'))
@@ -64,6 +69,16 @@ def parse_args(extra_args_provider=None, defaults={},
     args.dynamic_loss_scale = False
     if args.loss_scale is None:
         args.dynamic_loss_scale = True
+        if args.rank == 0:
+            print(' > using dynamic loss scaling')
+
+    # The args fp32_* or fp16_* meant to be active when the
+    # args fp16 is set. So the default behaviour should all
+    # be false.
+    if not args.fp16:
+        args.fp32_embedding = False
+        args.fp32_tokentypes = False
+        args.fp32_layernorm = False
 
     # Parameters dtype.
     args.params_dtype = torch.float
@@ -229,6 +244,8 @@ def _add_training_args(parser):
                        'across model parallel group.')
     group.add_argument('--checkpoint-num-layers', type=int, default=1,
                        help='chunk size (number of layers) for checkpointing.')
+    group.add_argument('--deepspeed-activation-checkpointing', action='store_true',
+                       help='uses activation checkpointing from deepspeed')
     group.add_argument('--train-iters', type=int, default=None,
                        help='Total number of iterations to train over all '
                        'training runs.')
@@ -338,6 +355,12 @@ def _add_mixed_precision_args(parser):
                        'attention-softmax-in-fp32 to true')
     group.add_argument('--attention-softmax-in-fp32', action='store_true',
                        help='Run attention masking and softmax in fp32.')
+    group.add_argument('--fp32-embedding', action='store_true',
+                       help='embedding in fp32')
+    group.add_argument('--fp32-layernorm', action='store_true',
+                       help='layer norm in fp32')
+    group.add_argument('--fp32-tokentypes', action='store_true',
+                       help='embedding token types in fp32')
     group.add_argument('--fp32-allreduce', action='store_true',
                        help='All-reduce in fp32')
     group.add_argument('--hysteresis', type=int, default=2,

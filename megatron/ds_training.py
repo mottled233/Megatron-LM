@@ -23,6 +23,8 @@ import os
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from apex.optimizers import FusedAdam as Adam
 
+import deepspeed
+
 from megatron import get_args
 from megatron import get_timers
 from megatron import get_tensorboard_writer
@@ -32,7 +34,7 @@ from megatron.checkpointing import load_checkpoint
 from megatron.checkpointing import save_checkpoint
 from megatron.fp16 import FP16_Module
 from megatron.fp16 import FP16_Optimizer
-from megatron.initialize import initialize_megatron
+from megatron.initialize import _write_args_to_tensorboard, set_global_variables
 from megatron.learning_rates import AnnealingLR
 from megatron.model import DistributedDataParallel as LocalDDP
 from megatron.model import get_params_for_weight_decay_optimization
@@ -47,7 +49,7 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     """Main training program.
 
     This function will run the followings in the order provided:
-        1) initialize Megatron.
+        1) initialize torch distribution.
         2) setup model, optimizer and lr schedule using the model_provider.
         3) call train_val_test_data_provider to get train/val/test datasets.
         4) train the modle using the forward_step_func.
@@ -67,12 +69,17 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
         args_defaults: a dictionary from argument-name to argument-value. It
             to set already parse arguments.
     """
+    # Disable CuDNN.
+    torch.backends.cudnn.enabled = False
 
     # Initalize and get arguments, timers, and Tensorboard writer.
-    initialize_megatron(extra_args_provider=extra_args_provider,
-                        args_defaults=args_defaults)
+    set_global_variables(extra_args_provider=extra_args_provider,
+                         args_defaults=args_defaults,
+                         ignore_unknown_args=False)
 
     args = get_args()
+    initialize_distribution(args)
+
     timers = get_timers()
 
     # Model, optimizer, and learning rate.
@@ -113,6 +120,68 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
         evaluate_and_print_results(prefix, forward_step_func,
                                    test_data_iterator, model,
                                    0, True)
+
+
+'''
+    Optional DeepSpeed Activation Checkpointing features
+    Gives access to partition activations, contiguous memory optimizations
+    and cpu checkpointing.
+
+    Activation checkpoint requires keep track of the random states
+    and setting the random seed for each MP process. Megatron uses
+    mpu.get_cuda_rng_tracker and mpu.model_parallel_cuda_manual_seed
+    for keeping track of the random states and setting the random seeds.
+    Since they are used in places outside of activation checkpointing,
+    we overwrite them to maintain consistency.
+
+    This must be done before all the calls to mpu.model_parallel_cuda_manual_seed
+'''
+
+
+def set_deepspeed_activation_checkpointing(args):
+    deepspeed.checkpointing.configure(mpu, deepspeed_config=args.deepspeed_config, num_checkpoints=args.num_layers)
+    mpu.checkpoint = deepspeed.checkpointing.checkpoint
+    mpu.get_cuda_rng_tracker = deepspeed.checkpointing.get_cuda_rng_tracker
+    mpu.model_parallel_cuda_manual_seed = deepspeed.checkpointing.model_parallel_cuda_manual_seed
+
+
+def initialize_distribution(args):
+    """Initialize torch.distributed and mpu."""
+
+    # 这里会根据环境变量的配置，可能返回与实际卡数不同
+    device_count = torch.cuda.device_count()
+
+    if args.rank == 0:
+        print('> initializing torch distributed ...', flush=True)
+    # Manually set the device ids.
+    assert device_count > 0, "Need at least 1 gpu to start."
+
+    device = args.rank % device_count
+    if args.local_rank is not None:
+        assert args.local_rank == device, \
+            'expected local-rank to be the same as rank % device-count.'
+    else:
+        args.local_rank = device
+
+    torch.cuda.set_device(device)
+    # Call the init process
+    init_method = 'tcp://'
+    master_ip = os.getenv('MASTER_ADDR', 'localhost')
+    master_port = os.getenv('MASTER_PORT', '6000')
+    init_method += master_ip + ':' + master_port
+    print(f"init: {init_method} by rank{args.rank} local{args.local_rank}")
+    torch.distributed.init_process_group(
+        backend=args.distributed_backend,
+        world_size=args.world_size, rank=args.rank,
+        init_method=init_method)
+
+    # Set the model-parallel / data-parallel communicators.
+    mpu.initialize_model_parallel(args.model_parallel_size)
+
+    # Optional DeepSpeed Activation Checkpointing Features
+    #
+    if args.deepspeed and args.deepspeed_activation_checkpointing:
+        set_deepspeed_activation_checkpointing(args)
 
 
 def get_model(model_provider_func):
@@ -215,19 +284,22 @@ def setup_model_and_optimizer(model_provider_func):
     optimizer = get_optimizer(model)
     lr_scheduler = get_learning_rate_scheduler(optimizer)
 
+    if args.deepspeed:
+        print_rank_0("DeepSpeed is enabled.")
+
+        model, optimizer, _, lr_scheduler = deepspeed.initialize(
+            model=model,
+            optimizer=optimizer,
+            args=args,
+            lr_scheduler=lr_scheduler,
+            mpu=mpu,
+            dist_init_required=False
+        )
+
     if args.load is not None:
         args.iteration = load_checkpoint(model, optimizer, lr_scheduler)
     else:
         args.iteration = 0
-
-    # get model without FP16 and/or TorchDDP wrappers
-    unwrapped_model = model
-    while hasattr(unwrapped_model, 'module'):
-        unwrapped_model = unwrapped_model.module
-
-    if args.iteration == 0 and hasattr(unwrapped_model, 'init_state_dict_from_bert'):
-        print("Initializing ICT from pretrained BERT model", flush=True)
-        unwrapped_model.init_state_dict_from_bert()
 
     return model, optimizer, lr_scheduler
 
@@ -239,34 +311,42 @@ def backward_step(optimizer, model, loss):
 
     # Backward pass.
     timers('backward-backward').start()
-    optimizer.zero_grad(set_grads_to_None=True)
-    if args.fp16:
-        optimizer.backward(loss, update_master_grads=False)
+    if args.deepspeed:
+        model.backward(loss)
     else:
-        loss.backward()
+        optimizer.zero_grad(set_grads_to_None=True)
+        if args.fp16:
+            optimizer.backward(loss, update_master_grads=False)
+        else:
+            loss.backward()
     timers('backward-backward').stop()
 
-    # All-reduce if needed.
-    if args.DDP_impl == 'local':
-        timers('backward-allreduce').start()
-        model.allreduce_params(reduce_after=False,
-                               fp32_allreduce=args.fp32_allreduce)
-        timers('backward-allreduce').stop()
+    if args.deepspeed:
+        # DeepSpeed backward propagation already addressed all reduce communication.
+        # Reset the timer to avoid breaking timer logs below.
+        timers('backward-allreduce').reset()
+    else:
+        # All-reduce if needed.
+        if args.DDP_impl == 'local':
+            timers('backward-allreduce').start()
+            model.allreduce_params(reduce_after=False,
+                                   fp32_allreduce=args.fp32_allreduce)
+            timers('backward-allreduce').stop()
 
-    # Update master gradients.
-    timers('backward-master-grad').start()
-    if args.fp16:
-        optimizer.update_master_grads()
-    timers('backward-master-grad').stop()
+            # Update master gradients.
+            timers('backward-master-grad').start()
+            if args.fp16:
+                optimizer.update_master_grads()
+            timers('backward-master-grad').stop()
 
-    # Clipping gradients helps prevent the exploding gradient.
-    timers('backward-clip-grad').start()
-    if args.clip_grad > 0:
-        if not args.fp16:
-            mpu.clip_grad_norm(model.parameters(), args.clip_grad)
-        else:
-            optimizer.clip_master_grads(args.clip_grad)
-    timers('backward-clip-grad').stop()
+            # Clipping gradients helps prevent the exploding gradient.
+            timers('backward-clip-grad').start()
+            if args.clip_grad > 0:
+                if not args.fp16:
+                    mpu.clip_grad_norm(model.parameters(), args.clip_grad)
+                else:
+                    optimizer.clip_master_grads(args.clip_grad)
+            timers('backward-clip-grad').stop()
 
 
 def train_step(forward_step_func, data_iterator,
@@ -287,15 +367,17 @@ def train_step(forward_step_func, data_iterator,
 
     # Update parameters.
     timers('optimizer').start()
-    optimizer.step()
-    timers('optimizer').stop()
-
-    # Update learning rate.
-    skipped_iter = 0
-    if not (args.fp16 and optimizer.overflow):
-        lr_scheduler.step()
+    if args.deepspeed:
+        model.step()
     else:
-        skipped_iter = 1
+        optimizer.step()
+
+        # Update learning rate.
+        if not (args.fp16 and optimizer.overflow):
+            lr_scheduler.step()
+        else:
+            skipped_iter = 1
+    timers('optimizer').stop()
 
     return loss_reduced, skipped_iter
 
@@ -420,7 +502,8 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
         # Logging.
         loss_scale = None
         if args.fp16:
-            loss_scale = optimizer.loss_scale
+            loss_scale = optimizer.cur_scale if args.deepspeed else optimizer.loss_scale
+
         report_memory_flag = training_log(loss_dict, total_loss_dict,
                                           optimizer.param_groups[0]['lr'],
                                           iteration, loss_scale,
@@ -478,6 +561,12 @@ def evaluate(forward_step_func, data_iterator, model, verbose=False):
             for key in loss_dict:
                 total_loss_dict[key] = total_loss_dict.get(key, 0.) + \
                     loss_dict[key]
+            '''when contiguous memory optimizations are enabled, the buffers
+            allocated by the optimizations are deallocated during backward pass
+            in the absence of backward pass the buffers should be reset after each
+            forward pass'''
+            if args.deepspeed and args.deepspeed_activation_checkpointing:
+                deepspeed.checkpointing.reset()
     # Move model back to the train mode.
     model.train()
 

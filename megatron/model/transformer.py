@@ -19,6 +19,8 @@ import math
 import torch
 import torch.nn.functional as F
 
+import deepspeed
+
 from megatron import get_args
 from megatron import mpu
 from megatron.mpu import LayerNorm
@@ -33,6 +35,10 @@ torch._C._jit_set_profiling_mode(False)
 torch._C._jit_set_profiling_executor(False)
 torch._C._jit_override_can_fuse_on_cpu(True)
 torch._C._jit_override_can_fuse_on_gpu(True)
+
+if deepspeed.checkpointing.is_configured():
+    mpu.get_cuda_rng_tracker = deepspeed.checkpoint.get_cuda_rng_tracker
+    mpu.checkpoint = deepspeed.checkpointing.checkpoint
 
 """ We use the following notation throughout this file:
      h: hidden size

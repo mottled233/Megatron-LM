@@ -89,45 +89,63 @@ def get_checkpoint_tracker_filename(checkpoints_path):
     return os.path.join(checkpoints_path, 'latest_checkpointed_iteration.txt')
 
 
+def save_ds_checkpoint(iteration, model, args):
+    """Save a model checkpoint."""
+
+    sd = dict()
+    sd['iteration'] = iteration
+    # rng states.
+    if not args.no_save_rng:
+        sd['random_rng_state'] = random.getstate()
+        sd['np_rng_state'] = np.random.get_state()
+        sd['torch_rng_state'] = torch.get_rng_state()
+        sd['cuda_rng_state'] = torch.cuda.get_rng_state()
+        sd['rng_tracker_states'] = mpu.get_cuda_rng_tracker().get_states()
+
+    model.save_checkpoint(args.save, iteration, client_state=sd)
+
+
 def save_checkpoint(iteration, model, optimizer, lr_scheduler):
     """Save a model checkpoint."""
     args = get_args()
+    if args.deepspeed:
+        save_ds_checkpoint(iteration, model, args)
+    else:
+        # Only rank zero of the data parallel writes to the disk.
+        if isinstance(model, torchDDP):
+            model = model.module
+        if mpu.get_data_parallel_rank() == 0:
 
-    # Only rank zero of the data parallel writes to the disk.
-    if isinstance(model, torchDDP):
-        model = model.module
-    if mpu.get_data_parallel_rank() == 0:
+            # Arguments, iteration, and model.
+            state_dict = {}
+            state_dict['args'] = args
+            state_dict['checkpoint_version'] = 2.0
+            state_dict['iteration'] = iteration
+            state_dict['model'] = model.state_dict_for_save_checkpoint()
 
-        # Arguments, iteration, and model.
-        state_dict = {}
-        state_dict['args'] = args
-        state_dict['checkpoint_version'] = 2.0
-        state_dict['iteration'] = iteration
-        state_dict['model'] = model.state_dict_for_save_checkpoint()
+            # Optimizer stuff.
+            if not args.no_save_optim:
+                if optimizer is not None:
+                    state_dict['optimizer'] = optimizer.state_dict()
+                if lr_scheduler is not None:
+                    state_dict['lr_scheduler'] = lr_scheduler.state_dict()
 
-        # Optimizer stuff.
-        if not args.no_save_optim:
-            if optimizer is not None:
-                state_dict['optimizer'] = optimizer.state_dict()
-            if lr_scheduler is not None:
-                state_dict['lr_scheduler'] = lr_scheduler.state_dict()
+            # RNG states.
+            if not args.no_save_rng:
+                state_dict['random_rng_state'] = random.getstate()
+                state_dict['np_rng_state'] = np.random.get_state()
+                state_dict['torch_rng_state'] = torch.get_rng_state()
+                state_dict['cuda_rng_state'] = torch.cuda.get_rng_state()
+                state_dict['rng_tracker_states'] \
+                    = mpu.get_cuda_rng_tracker().get_states()
 
-        # RNG states.
-        if not args.no_save_rng:
-            state_dict['random_rng_state'] = random.getstate()
-            state_dict['np_rng_state'] = np.random.get_state()
-            state_dict['torch_rng_state'] = torch.get_rng_state()
-            state_dict['cuda_rng_state'] = torch.cuda.get_rng_state()
-            state_dict['rng_tracker_states'] \
-                = mpu.get_cuda_rng_tracker().get_states()
-
-        # Save.
-        checkpoint_name = get_checkpoint_name(args.save, iteration)
-        print('global rank {} is saving checkpoint at iteration {:7d} to {}'.
-              format(torch.distributed.get_rank(), iteration, checkpoint_name))
-        ensure_directory_exists(checkpoint_name)
-        torch.save(state_dict, checkpoint_name)
-        print('  successfully saved {}'.format(checkpoint_name))
+            # Save.
+            checkpoint_name = get_checkpoint_name(args.save, iteration)
+            print('global rank {} is saving checkpoint at iteration {:7d} to {}'.
+                  format(torch.distributed.get_rank(), iteration, checkpoint_name))
+            ensure_directory_exists(checkpoint_name)
+            torch.save(state_dict, checkpoint_name)
+            print('  successfully saved {}'.format(checkpoint_name))
 
     # Wait so everyone is done (necessary)
     torch.distributed.barrier()
@@ -140,26 +158,15 @@ def save_checkpoint(iteration, model, optimizer, lr_scheduler):
     torch.distributed.barrier()
 
 
-def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
-    """Load a model checkpoint and return the iteration."""
-    args = get_args()
-    load_dir = getattr(args, load_arg)
-
-    if isinstance(model, torchDDP):
-        model = model.module
+def get_checkpoint_iteration(args):
     # Read the tracker file and set the iteration.
-    tracker_filename = get_checkpoint_tracker_filename(load_dir)
-
-    # If no tracker file, return iretation zero.
+    tracker_filename = get_checkpoint_tracker_filename(args.load)
     if not os.path.isfile(tracker_filename):
         print_rank_0('WARNING: could not find the metadata file {} '.format(
             tracker_filename))
         print_rank_0('    will not load any checkpoints and will start from '
                      'random')
-        return 0
-
-    # Otherwise, read the tracker file and either set the iteration or
-    # mark it as a release checkpoint.
+        return 0, False, False
     iteration = 0
     release = False
     with open(tracker_filename, 'r') as f:
@@ -171,10 +178,34 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
             if not release:
                 print_rank_0('ERROR: Invalid metadata file {}. Exiting'.format(
                     tracker_filename))
-                sys.exit()
+                exit()
 
     assert iteration > 0 or release, 'error parsing metadata file {}'.format(
         tracker_filename)
+
+    return iteration, release, True
+
+
+def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
+    """Load a model checkpoint and return the iteration."""
+    args = get_args()
+    load_dir = getattr(args, load_arg)
+
+    iteration, release, success = get_checkpoint_iteration(args)
+    if not success:
+        return 0
+
+    if args.deepspeed:
+
+        checkpoint_name, sd = model.load_checkpoint(args.load, iteration)
+
+        if checkpoint_name is None:
+            if mpu.get_data_parallel_rank() == 0:
+                print("Unable to load checkpoint.")
+            return iteration
+
+    if isinstance(model, torchDDP):
+        model = model.module
 
     # Checkpoint.
     checkpoint_name = get_checkpoint_name(load_dir, iteration, release)

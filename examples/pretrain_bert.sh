@@ -9,7 +9,7 @@ python pretrain_bert.py \
        --num-layers 24 \
        --hidden-size 1024 \
        --num-attention-heads 16 \
-       --batch-size 4 \
+       --batch-size 256 \
        --seq-length 512 \
        --max-position-embeddings 512 \
        --train-iters 2000000 \

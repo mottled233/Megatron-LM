@@ -90,8 +90,10 @@ def forward_step(data_iterator, model):
         lm_loss_.view(-1) * loss_mask.reshape(-1)) / loss_mask.sum()
 
     loss = lm_loss + sop_loss
-
-    reduced_losses = reduce_losses([lm_loss, sop_loss])
+    if args.deepspeed:
+        reduced_losses = [lm_loss, sop_loss]
+    else:
+        reduced_losses = reduce_losses([lm_loss, sop_loss])
 
     return loss, {'lm loss': reduced_losses[0], 'sop loss': reduced_losses[1]}
 
