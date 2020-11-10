@@ -23,6 +23,8 @@ import os
 from torch.nn.parallel.distributed import DistributedDataParallel as torchDDP
 from apex.optimizers import FusedAdam as Adam
 
+import deepspeed
+
 from megatron import get_args
 from megatron import get_timers
 from megatron import get_tensorboard_writer

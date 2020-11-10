@@ -220,6 +220,8 @@ def main():
             print(f"Processed {i} documents",
                   f"({i/elapsed} docs/s, {mbs} MB/s).",
                   file=sys.stderr)
+            proc_start = time.time()
+            total_bytes_processed = 0
 
     for key in args.json_keys:
         builders[key].finalize(output_idx_files[key])
