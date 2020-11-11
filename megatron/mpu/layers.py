@@ -169,7 +169,7 @@ class VocabParallelEmbedding(torch.nn.Module):
         if args.deepspeed:
             self.weight = Parameter(torch.empty(
                 self.num_embeddings_per_partition, self.embedding_dim,
-                dtype=args.params_dtype))
+                device=torch.cuda.current_device(), dtype=args.params_dtype))
             _initialize_affine_weight_deepspeed(
                 self.weight, self.num_embeddings, self.embedding_dim,
                 self.num_embeddings_per_partition, 1, init_method,
@@ -257,8 +257,9 @@ class ColumnParallelLinear(torch.nn.Module):
         # Initialize weight.
         args = get_args()
         if args.deepspeed:
-            self.weight = Parameter(torch.Tensor(self.output_size_per_partition,
-                                                 self.input_size))
+            self.weight = Parameter(torch.empty(
+                    self.output_size_per_partition, self.input_size,
+                    device=torch.cuda.current_device(), dtype=args.params_dtype))
             self.weight.model_parallel = True
             self.master_weight = _initialize_affine_weight_deepspeed(
                 self.weight, self.output_size, self.input_size,
@@ -281,18 +282,15 @@ class ColumnParallelLinear(torch.nn.Module):
                                               partition_dim=0, stride=stride)
             
         if bias:
-            if args.deepspeed:
-                self.bias = Parameter(torch.Tensor(self.output_size_per_partition),
-                                      dtype=args.params_dtype)
+
+            if args.use_cpu_initialization:
+                self.bias = Parameter(torch.empty(
+                    self.output_size_per_partition, dtype=args.params_dtype))
             else:
-                if args.use_cpu_initialization:
-                    self.bias = Parameter(torch.empty(
-                        self.output_size_per_partition, dtype=args.params_dtype))
-                else:
-                    self.bias = Parameter(torch.empty(
-                        self.output_size_per_partition,
-                        device=torch.cuda.current_device(),
-                        dtype=args.params_dtype))
+                self.bias = Parameter(torch.empty(
+                    self.output_size_per_partition,
+                    device=torch.cuda.current_device(),
+                    dtype=args.params_dtype))
             self.bias.model_parallel = True
             self.bias.partition_dim = 0
             self.bias.stride = stride
@@ -301,8 +299,6 @@ class ColumnParallelLinear(torch.nn.Module):
                 self.bias.zero_()
         else:
             self.register_parameter('bias', None)
-
-
 
     def forward(self, input_):
         # Set up backprop all-reduce.
@@ -372,8 +368,9 @@ class RowParallelLinear(torch.nn.Module):
         # Initialize weight.
         args = get_args()
         if args.deepspeed:
-            self.weight = Parameter(torch.Tensor(self.output_size,
-                                                 self.input_size_per_partition))
+            self.weight = Parameter(torch.empty(
+                self.output_size, self.input_size_per_partition,
+                device=torch.cuda.current_device(), dtype=args.params_dtype))
             self.weight.model_parallel = True
             self.master_weight = _initialize_affine_weight_deepspeed(
                 self.weight, self.output_size, self.input_size,
@@ -396,8 +393,9 @@ class RowParallelLinear(torch.nn.Module):
                                               partition_dim=1, stride=stride)
         if bias:
             if args.deepspeed:
-                self.bias = Parameter(torch.Tensor(self.output_size),
-                                      dtype=args.params_dtype)
+                self.bias = Parameter(torch.empty(
+                    self.output_size, device=torch.cuda.current_device(),
+                    dtype=args.params_dtype))
             else:
                 if args.use_cpu_initialization:
                     self.bias = Parameter(torch.empty(self.output_size,
@@ -405,14 +403,12 @@ class RowParallelLinear(torch.nn.Module):
                 else:
                     self.bias = Parameter(torch.empty(
                         self.output_size, device=torch.cuda.current_device(),
-                    dtype=args.params_dtype))
+                        dtype=args.params_dtype))
             # Always initialize bias to zero.
             with torch.no_grad():
                 self.bias.zero_()
         else:
             self.register_parameter('bias', None)
-
-
 
     def forward(self, input_):
         # Set up backprop all-reduce.
