@@ -172,7 +172,7 @@ class VocabParallelEmbedding(torch.nn.Module):
                 dtype=args.params_dtype))
             _initialize_affine_weight_deepspeed(
                 self.weight, self.num_embeddings, self.embedding_dim,
-                self.embedding_dim_per_partition, 1, init_method,
+                self.num_embeddings_per_partition, 1, init_method,
                 stride=1, return_master_weight=False)
         else:
             if args.use_cpu_initialization:
