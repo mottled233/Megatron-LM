@@ -46,7 +46,7 @@ bert_options=" \
 bert_options="${bert_options}
                --deepspeed \
                --deepspeed_config ${config_json} \
-               --hostfile ${hostfile} \
+               --hostfile=${hostfile} \
 "
 
 
