@@ -24,7 +24,7 @@ from megatron import get_timers
 from megatron import mpu
 from megatron.data.dataset_utils import build_train_valid_test_datasets
 from megatron.model import BertModel
-from megatron.training import pretrain
+from megatron.ds_training import pretrain
 from megatron.utils import reduce_losses
 
 

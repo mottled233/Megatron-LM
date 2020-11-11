@@ -13,7 +13,7 @@ script_path=$(realpath $0)
 script_dir=$(dirname $script_path)
 
 config_json="$script_dir/ds_zero2_config.json"
-hostfile="$script_dir/hostfile"
+
 bert_options=" \
        --model-parallel-size ${MP_SIZE} \
        --num-layers 24 \
@@ -46,11 +46,11 @@ bert_options=" \
 bert_options="${bert_options}
                --deepspeed \
                --deepspeed_config ${config_json} \
-               --hostfile=${hostfile} \
+               --hostfile=myhostfile \
 "
 
 
-run_cmd="deepspeed --num_nodes ${NUM_WORKERS} --num_gpus ${NUM_GPUS_PER_WORKER} pretrain_gpt2.py $@ ${bert_options}"
+run_cmd="deepspeed --num_nodes ${NUM_WORKERS} --num_gpus ${NUM_GPUS_PER_WORKER} pretrain_bert.py $@ ${bert_options}"
 echo ${run_cmd}
 eval ${run_cmd}
 
