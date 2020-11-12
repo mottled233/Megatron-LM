@@ -7,7 +7,7 @@ NUM_WORKERS=4
 NUM_GPUS_PER_WORKER=8
 
 DATA_PATH=/cfs/aidenliang/corpus/wiki_data/db/wiki_and_book_text_sentence
-CHECKPOINT_PATH=/cfs/aidenliang/checkpoints/megatron_run_test
+CHECKPOINT_PATH=/cfs/aidenliang/checkpoints/ds_megatron_grad_acc_test
 
 script_path=$(realpath $0)
 script_dir=$(dirname $script_path)
