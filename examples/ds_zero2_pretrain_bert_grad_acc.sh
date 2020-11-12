@@ -11,6 +11,7 @@ CHECKPOINT_PATH=/cfs/aidenliang/checkpoints/ds_megatron_grad_acc_test
 
 script_path=$(realpath $0)
 script_dir=$(dirname $script_path)
+JOB_NAME=DS_ACC
 
 config_json="$script_dir/ds_zero2_grad_acc_64k_config.json"
 hostfile="$script_dir/myhostfile"
@@ -50,7 +51,7 @@ bert_options="${bert_options}
 "
 
 
-run_cmd="deepspeed --num_nodes ${NUM_WORKERS} --num_gpus ${NUM_GPUS_PER_WORKER} --hostfile=${hostfile} pretrain_bert.py $@ ${bert_options}"
+run_cmd="deepspeed --num_nodes ${NUM_WORKERS} --num_gpus ${NUM_GPUS_PER_WORKER} --hostfile=${hostfile} pretrain_bert.py $@ ${bert_options} &> ${JOB_NAME}.log"
 echo ${run_cmd}
 eval ${run_cmd}
 
