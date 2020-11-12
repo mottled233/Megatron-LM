@@ -371,6 +371,7 @@ def train_step(forward_step_func, data_iterator,
 
     # Update parameters.
     timers('optimizer').start()
+    skipped_iter = 0
     if args.deepspeed:
         model.step()
     else:
