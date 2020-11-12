@@ -46,9 +46,6 @@ bert_options=" \
 bert_options="${bert_options}
                --deepspeed \
                --deepspeed_config ${config_json} \
-               --deepspeed_transformer_kernel \
-               --lr_schedule EE \
-               --rewarmup \
 
 "
 
