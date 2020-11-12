@@ -236,6 +236,9 @@ def get_optimizer(model):
             if not hasattr(param, 'model_parallel'):
                 param.model_parallel = False
 
+    if args.use_lamb:
+        return param_groups
+
     # Use Adam.
     optimizer = Adam(param_groups, lr=args.lr, weight_decay=args.weight_decay,
         betas=(args.adam_beta1, args.adam_beta2), eps=args.adam_eps)
@@ -290,15 +293,23 @@ def setup_model_and_optimizer(model_provider_func):
     if args.deepspeed:
         print_rank_0("DeepSpeed is enabled.")
         if args.use_lamb:
-            optimizer = None
-        model, optimizer, _, lr_scheduler = deepspeed.initialize(
-            model=model,
-            optimizer=optimizer,
-            args=args,
-            lr_scheduler=lr_scheduler,
-            mpu=mpu,
-            dist_init_required=False
-        )
+            model, optimizer, _, lr_scheduler = deepspeed.initialize(
+                model=model,
+                model_parameters=optimizer,
+                args=args,
+                lr_scheduler=lr_scheduler,
+                mpu=mpu,
+                dist_init_required=False
+            )
+        else:
+            model, optimizer, _, lr_scheduler = deepspeed.initialize(
+                model=model,
+                optimizer=optimizer,
+                args=args,
+                lr_scheduler=lr_scheduler,
+                mpu=mpu,
+                dist_init_required=False
+            )
 
     if args.load is not None:
         args.iteration = load_checkpoint(model, optimizer, lr_scheduler)
