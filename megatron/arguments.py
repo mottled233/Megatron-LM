@@ -249,6 +249,8 @@ def _add_training_args(parser):
     group.add_argument('--train-iters', type=int, default=None,
                        help='Total number of iterations to train over all '
                        'training runs.')
+    group.add_argument('--use-lamb', action='store_true',
+                        help='Enable use deep speed lamb optimizer.')
     group.add_argument('--log-interval', type=int, default=100,
                        help='Report loss and timing interval.')
     group.add_argument('--exit-interval', type=int, default=None,

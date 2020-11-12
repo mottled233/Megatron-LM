@@ -34,7 +34,7 @@ from megatron.checkpointing import load_checkpoint
 from megatron.checkpointing import save_checkpoint
 from megatron.fp16 import FP16_Module
 from megatron.fp16 import FP16_Optimizer
-from megatron.initialize import _write_args_to_tensorboard, set_global_variables
+from megatron.initialize import _write_args_to_tensorboard, set_global_variables, _set_random_seed
 from megatron.learning_rates import AnnealingLR
 from megatron.model import DistributedDataParallel as LocalDDP
 from megatron.model import get_params_for_weight_decay_optimization
@@ -79,6 +79,9 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
 
     args = get_args()
     initialize_distribution(args)
+    if args.rank == 0:
+        print('> setting random seeds to {} ...'.format(args.seed))
+    _set_random_seed(args.seed)
 
     timers = get_timers()
 
@@ -286,7 +289,8 @@ def setup_model_and_optimizer(model_provider_func):
 
     if args.deepspeed:
         print_rank_0("DeepSpeed is enabled.")
-
+        if args.use_lamb:
+            optimizer = None
         model, optimizer, _, lr_scheduler = deepspeed.initialize(
             model=model,
             optimizer=optimizer,
