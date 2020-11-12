@@ -43,6 +43,7 @@ bert_options=" \
        --eval-interval 50 \
        --eval-iters 10 \
        --fp16 \
+       --use-lamb \
 "
 bert_options="${bert_options}
                --deepspeed \
