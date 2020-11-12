@@ -359,6 +359,7 @@ def build_train_valid_test_datasets(data_prefix, data_impl, splits_string,
                                     max_seq_length, masked_lm_prob,
                                     short_seq_prob, seed, skip_warmup,
                                     dataset_type='standard_bert'):
+    # 根据splits比例，按照文档进行划分。
 
     if dataset_type not in DSET_TYPES:
         raise ValueError("Invalid dataset_type: ", dataset_type)

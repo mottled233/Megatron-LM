@@ -21,6 +21,7 @@ bert_options=" \
        --hidden-size 1024 \
        --num-attention-heads 16 \
        --batch-size 16 \
+       --grad-acc-step 64 \
        --seq-length 512 \
        --max-position-embeddings 512 \
        --train-iters 7500 \
