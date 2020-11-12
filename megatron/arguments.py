@@ -236,7 +236,8 @@ def _add_training_args(parser):
                        'Global batch size is local batch size times data '
                        'parallel size.')
     group.add_argument('--grad-acc-step', type=int, default=1,
-                       help='Gradient accumulate every n step.')
+                       help='Gradient accumulate every n step.'
+                            'Only effects the number of generated sample.')
     group.add_argument('--checkpoint-activations', action='store_true',
                        help='Checkpoint activation to allow for training '
                        'with larger models, sequences, and batch sizes.')
