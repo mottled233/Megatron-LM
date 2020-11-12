@@ -76,8 +76,12 @@ class AnnealingLR(object):
             step_num = self.num_iters + 1
         self.num_iters = step_num
         new_lr = self.get_lr()
-        for group in self.optimizer.param_groups:
-            group['lr'] = new_lr
+        if type(self.optimizer) == tuple:
+            for group in self.optimizer:
+                group['lr'] = new_lr
+        else:
+            for group in self.optimizer.param_groups:
+                group['lr'] = new_lr
 
     def state_dict(self):
         state_dict = {
