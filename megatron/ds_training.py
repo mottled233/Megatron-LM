@@ -513,7 +513,7 @@ def train(forward_step_func, model, optimizer, lr_scheduler,
                                              model,
                                              optimizer,
                                              lr_scheduler)
-        if model.network.is_gradient_accumulation_boundary():
+        if model.is_gradient_accumulation_boundary():
             global_iteration += 1
 
             # Logging.
