@@ -10,7 +10,7 @@ options=" \
        --output-dir ${OUT_PATH} \
        --split-by sentence \
        --remove-empty-lines \
-       --num_of_workers 1 \
+       --num_of_workers ${NUM_WORKERS} \
 "
 
 run_cmd="python trans_book_corpus.py $@ ${options}"
