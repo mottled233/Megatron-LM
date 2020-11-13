@@ -18,11 +18,9 @@ def parse_args():
                        help='Skip the first n lines')
     group.add_argument('--split-by', type=str, default="sentence",
                        choices=['sentence', 'paragraph'])
-    group.add_argument('--remove-empty-lines', type=bool, default=True)
+    group.add_argument('--remove-empty-lines', type=bool, action="store_true")
     group.add_argument('--json-key', type=str, default="text")
-    group.add_argument('--log-step', type=int, default=100)
     group.add_argument('--max-seq-len', type=int, default=600)
-    group.add_argument('--buff_file', type=int, default=1000)
     group.add_argument('--num_of_workers', type=int, default=1)
     args = parser.parse_args()
     return args
