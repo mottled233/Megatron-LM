@@ -5,6 +5,7 @@ from tqdm import tqdm
 import nltk
 import multiprocessing
 from functools import partial
+from tools.preprocess_data import CustomLanguageVars
 
 
 def whitespace_tokenize(text):
@@ -57,6 +58,8 @@ def process_book(filename, parent_dir, args, splitter):
             continue
         file += line
     file = splitter(file)
+    if args.split_by == "paragraph":
+        file = [line + "\n" for line in file]
 
     wd_count = 0
     for line in file:
@@ -80,6 +83,10 @@ def main():
         splitter = para_splitter
     elif args.split_by == "sentence":
         splitter = nltk.load("tokenizers/punkt/english.pickle").tokenize
+        # this prevents punkt from eating newlines after sentences
+        splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
+                    train_text=splitter._params,
+                    lang_vars=CustomLanguageVars())
     else:
         splitter = None
 
