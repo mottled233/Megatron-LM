@@ -65,7 +65,7 @@ def main():
     if args.split_by == "paragraph":
         splitter = para_splitter
     elif args.split_by == "sentence":
-        splitter = nltk.load("tokenizers/punkt/english.pickle")
+        splitter = nltk.load("tokenizers/punkt/english.pickle").tokenize
     else:
         splitter = None
 
