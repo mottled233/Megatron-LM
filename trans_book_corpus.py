@@ -7,6 +7,15 @@ import multiprocessing
 from functools import partial
 
 
+def whitespace_tokenize(text):
+    """Runs basic whitespace cleaning and splitting on a piece of text."""
+    text = text.strip()
+    if not text:
+        return []
+    tokens = text.split()
+    return tokens
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='input data')
@@ -40,6 +49,7 @@ def process_book(filename, parent_dir, args, splitter):
         lines = f1.readlines()
     file = ""
     sub_file = ""
+
     for idx, line in enumerate(lines):
         if idx < args.remove_lines:
             continue
@@ -47,12 +57,16 @@ def process_book(filename, parent_dir, args, splitter):
             continue
         file += line
     file = splitter(file)
+
+    wd_count = 0
     for line in file:
         sub_file += line
-        if len(sub_file) >= args.max_seq_len:
+        wd_count += len(whitespace_tokenize(line))
+        if wd_count >= args.max_seq_len:
             json_data = {args.json_key: sub_file}
             buff.append(json.dumps(json_data))
             sub_file = ""
+            wd_count = 0
     with open(f"{args.output_dir}/books_{filename}.json", 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
 
