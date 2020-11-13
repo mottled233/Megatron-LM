@@ -1,9 +1,9 @@
 #! /bin/bash
 
-NUM_WORKERS=4
+NUM_WORKERS=8
 
 DATA_PATH=/cfs/aidenliang/corpus/books1/epubtxt
-OUT_PATH=/cfs/aidenliang/corpus/books1/testout
+OUT_PATH=/cfs/aidenliang/corpus/books1/fine_splitted
 
 options=" \
        --input ${DATA_PATH} \

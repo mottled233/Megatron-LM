@@ -70,6 +70,10 @@ def process_book(filename, parent_dir, args, splitter):
             buff.append(json.dumps(json_data))
             sub_file = ""
             wd_count = 0
+    if sub_file != "":
+        json_data = {args.json_key: sub_file}
+        buff.append(json.dumps(json_data))
+
     with open(f"{args.output_dir}/books_{filename}.json", 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
 
@@ -96,7 +100,7 @@ def main():
     for parent, dirnames, filenames in tqdm(os.walk(args.input)):
         parser = partial(process_book, parent_dir=parent, args=args, splitter=splitter)
         if args.num_of_workers > 1:
-            for _ in tqdm(pool.imap(parser, filenames, 16)):
+            for _ in tqdm(pool.imap(parser, filenames)):
                 pass
         else:
             for file in tqdm(filenames):
