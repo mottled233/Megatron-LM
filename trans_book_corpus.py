@@ -96,7 +96,7 @@ def main():
     for parent, dirnames, filenames in tqdm(os.walk(args.input)):
         parser = partial(process_book, parent_dir=parent, args=args, splitter=splitter)
         if args.num_of_workers > 1:
-            for _ in tqdm(pool.imap(parser, filenames)):
+            for _ in tqdm(pool.imap(parser, filenames, 16)):
                 pass
         else:
             for file in tqdm(filenames):
