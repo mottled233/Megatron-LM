@@ -82,11 +82,11 @@ def main():
     if args.split_by == "paragraph":
         splitter = para_splitter
     elif args.split_by == "sentence":
-        splitter = nltk.load("tokenizers/punkt/english.pickle").tokenize
+        splitter = nltk.load("tokenizers/punkt/english.pickle")
         # this prevents punkt from eating newlines after sentences
         splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
                     train_text=splitter._params,
-                    lang_vars=CustomLanguageVars())
+                    lang_vars=CustomLanguageVars()).tokenize
     else:
         splitter = None
 
