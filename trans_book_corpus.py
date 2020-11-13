@@ -29,7 +29,7 @@ def parse_args():
                        choices=['sentence', 'paragraph'])
     group.add_argument('--remove-empty-lines', action='store_true')
     group.add_argument('--json-key', type=str, default="text")
-    group.add_argument('--max-seq-len', type=int, default=600)
+    group.add_argument('--max-seq-len', type=int, default=500)
     group.add_argument('--num_of_workers', type=int, default=1)
     args = parser.parse_args()
     return args
