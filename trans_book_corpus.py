@@ -59,7 +59,7 @@ def para_splitter(text):
 def lang_check(doc):
     ready_to_check = "None"
     for line in doc:
-        if len(whitespace_tokenize(line)) > 100:
+        if len(whitespace_tokenize(line)) > 30:
             ready_to_check = line
     try:
         lang = detect_langs(ready_to_check)[0]
