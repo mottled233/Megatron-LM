@@ -82,7 +82,7 @@ def filter_doc(doc, args):
 
 def process_book(filename, parent_dir, args, splitter):
     tokenize_timer = 0
-    check_timer = 0
+    check_timer = 0.000000001
     current = os.path.join(parent_dir, filename)
     buff = []
     with open(current, 'r', encoding='utf-8') as f1:
