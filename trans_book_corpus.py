@@ -114,12 +114,12 @@ def process_book(filename, parent_dir, args, splitter):
         if wd_count >= args.max_seq_len:
             if filter_doc(doc=sub_file, args=args, lang=already_check_lang):
                 json_data = {args.json_key: sub_file}
-                buff.append(json.dumps(json_data))
+                buff.append(json.dumps(json_data, ensure_ascii=False))
             sub_file = ""
             wd_count = 0
     if sub_file != "" and filter_doc(doc=sub_file, args=args, lang=already_check_lang):
         json_data = {args.json_key: sub_file}
-        buff.append(json.dumps(json_data))
+        buff.append(json.dumps(json_data, ensure_ascii=False))
 
     with open(f"{args.output_dir}/books_{filename}.json", 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
