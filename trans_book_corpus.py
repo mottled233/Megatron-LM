@@ -6,6 +6,7 @@ import nltk
 import multiprocessing
 from functools import partial
 from tools.preprocess_data import CustomLanguageVars
+from langdetect import detect_langs
 
 
 def whitespace_tokenize(text):
@@ -24,14 +25,24 @@ def parse_args():
                        help='Path to input book corpus')
     group.add_argument('--output-dir', type=str, required=True,
                        help='Path to output book corpus')
+    group.add_argument('--json-key', type=str, default="text")
+    group.add_argument('--max-seq-len', type=int, default=500)
+    group.add_argument('--num_of_workers', type=int, default=1)
+
+    group = parser.add_argument_group(title='cleaning data')
     group.add_argument('--remove-lines', type=int, default=60,
                        help='Skip the first n lines')
     group.add_argument('--split-by', type=str, default="sentence",
                        choices=['sentence', 'paragraph'])
     group.add_argument('--remove-empty-lines', action='store_true')
-    group.add_argument('--json-key', type=str, default="text")
-    group.add_argument('--max-seq-len', type=int, default=500)
-    group.add_argument('--num_of_workers', type=int, default=1)
+    group.add_argument('--keep-non-english', action='store_true',
+                       help='Notice that if not active this argument, '
+                            'only the document which full of other language will be removed,'
+                            'but not the doc that the other languages characters that appear sporadically')
+    group.add_argument('--keep-list', action='store_true',
+                       help='If not activated, the docs with more than 5 consecutive sentences '
+                            'less than 10 words in a row will be deleted')
+
     args = parser.parse_args()
     return args
 
@@ -41,6 +52,27 @@ def para_splitter(text):
         string = string.replace("\n", "")
         return len(string) > 0
     return filter(no_blank, text.split("\n"))
+
+
+def filter_doc(doc, args):
+    # Detect non-English document
+    if not args.keep_non_english:
+        lang = detect_langs(doc)
+        if lang.lang != 'en' or lang.prob < 0.9:
+            return False
+
+    # Deleted list data
+    if not args.keep_list:
+        short_cnt = 0
+        for sent in doc.split('\n'):
+            if len(sent.split()) <= 10:
+                short_cnt += 1
+                if short_cnt > 5:
+                    return False
+            else:
+                short_cnt = 0
+
+    return True
 
 
 def process_book(filename, parent_dir, args, splitter):
@@ -66,11 +98,12 @@ def process_book(filename, parent_dir, args, splitter):
         sub_file += line
         wd_count += len(whitespace_tokenize(line))
         if wd_count >= args.max_seq_len:
-            json_data = {args.json_key: sub_file}
-            buff.append(json.dumps(json_data))
+            if filter_doc(doc=sub_file, args=args):
+                json_data = {args.json_key: sub_file}
+                buff.append(json.dumps(json_data))
             sub_file = ""
             wd_count = 0
-    if sub_file != "":
+    if sub_file != "" and filter_doc(doc=sub_file, args=args):
         json_data = {args.json_key: sub_file}
         buff.append(json.dumps(json_data))
 
