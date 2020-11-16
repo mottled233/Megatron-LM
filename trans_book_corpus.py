@@ -7,6 +7,7 @@ import multiprocessing
 from functools import partial
 from tools.preprocess_data import CustomLanguageVars
 from langdetect import detect_langs
+import langdetect
 
 
 def whitespace_tokenize(text):
@@ -57,7 +58,10 @@ def para_splitter(text):
 def filter_doc(doc, args):
     # Detect non-English document
     if not args.keep_non_english:
-        lang = detect_langs(doc[:100])[0]
+        try:
+            lang = detect_langs(doc[:100])[0]
+        except langdetect.lang_detect_exception.LangDetectException:
+            return False
         if lang.lang != 'en' or lang.prob < 0.9:
             return False
 
