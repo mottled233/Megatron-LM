@@ -1,6 +1,6 @@
 #! /bin/bash
 
-NUM_WORKERS=1
+NUM_WORKERS=16
 
 DATA_PATH=/cfs/aidenliang/corpus/books3/the-eye.eu/public/Books/Bibliotik
 OUT_PATH=/cfs/aidenliang/corpus/books3/fine_splitted
