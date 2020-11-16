@@ -96,7 +96,7 @@ def process_book(filename, parent_dir, args, splitter):
     buff = []
     with open(current, 'r', encoding='utf-8') as f1:
         lines = f1.readlines()
-    file = ""
+    file = []
     sub_file = ""
 
     for idx, line in enumerate(lines):
@@ -106,11 +106,11 @@ def process_book(filename, parent_dir, args, splitter):
             continue
         file += line
 
+    file = "".join(file[:-args.remove_ends])
+
     file = splitter(file)
     if args.split_by == "paragraph":
         file = [line + "\n" for line in file]
-
-    file = file[:args.remove_ends]
 
     if not args.keep_non_english:
         already_check_lang = lang_check(file)
