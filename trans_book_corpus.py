@@ -57,7 +57,7 @@ def para_splitter(text):
 def filter_doc(doc, args):
     # Detect non-English document
     if not args.keep_non_english:
-        lang = detect_langs(doc)
+        lang = detect_langs(doc)[0]
         if lang.lang != 'en' or lang.prob < 0.9:
             return False
 
