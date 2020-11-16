@@ -57,8 +57,12 @@ def para_splitter(text):
 
 
 def lang_check(doc):
+    ready_to_check = "None"
+    for line in doc:
+        if len(whitespace_tokenize(line)) > 100:
+            ready_to_check = line
     try:
-        lang = detect_langs(doc[:50])[0]
+        lang = detect_langs(ready_to_check)[0]
     except langdetect.lang_detect_exception.LangDetectException:
         return None
     return lang
@@ -100,12 +104,12 @@ def process_book(filename, parent_dir, args, splitter):
             continue
         file += line
 
-    if not args.keep_non_english:
-        already_check_lang = lang_check(file[:100])
-
     file = splitter(file)
     if args.split_by == "paragraph":
         file = [line + "\n" for line in file]
+
+    if not args.keep_non_english:
+        already_check_lang = lang_check(file)
 
     wd_count = 0
     for line in file:
