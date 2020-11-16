@@ -120,7 +120,7 @@ def process_book(filename, parent_dir, args, splitter):
         json_data = {args.json_key: sub_file}
         buff.append(json.dumps(json_data))
 
-    print(f'check time = {check_timer}, token_time = {tokenize_timer}')
+    print(f'check time = {check_timer}, token_time = {tokenize_timer}, length effectivity = {tokenize_timer / check_timer}')
 
     with open(f"{args.output_dir}/books_{filename}.json", 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
