@@ -2,8 +2,8 @@
 
 NUM_WORKERS=8
 
-DATA_PATH=/cfs/aidenliang/corpus/books1/epubtxt
-OUT_PATH=/cfs/aidenliang/corpus/books1/fine_splitted
+DATA_PATH=/cfs/aidenliang/corpus/books3/the-eye.eu/public/Books/Bibliotik
+OUT_PATH=/cfs/aidenliang/corpus/books3/fine_splitted
 
 options=" \
        --input ${DATA_PATH} \
