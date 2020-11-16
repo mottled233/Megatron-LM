@@ -56,14 +56,18 @@ def para_splitter(text):
     return filter(no_blank, text.split("\n"))
 
 
-def filter_doc(doc, args):
+def lang_check(doc):
+    try:
+        lang = detect_langs(doc[:50])[0]
+    except langdetect.lang_detect_exception.LangDetectException:
+        return None
+    return lang
+
+
+def filter_doc(doc, args, lang=None):
     # Detect non-English document
     if not args.keep_non_english:
-        try:
-            lang = detect_langs(doc[:50])[0]
-        except langdetect.lang_detect_exception.LangDetectException:
-            return False
-        if lang.lang != 'en' or lang.prob < 0.9:
+        if lang is None or lang.lang != 'en' or lang.prob < 0.9:
             return False
 
     # Deleted list data
@@ -81,8 +85,7 @@ def filter_doc(doc, args):
 
 
 def process_book(filename, parent_dir, args, splitter):
-    tokenize_timer = 0
-    check_timer = 0.000000001
+    already_check_lang = None
     current = os.path.join(parent_dir, filename)
     buff = []
     with open(current, 'r', encoding='utf-8') as f1:
@@ -96,31 +99,27 @@ def process_book(filename, parent_dir, args, splitter):
         if args.remove_empty_lines and line == "\n":
             continue
         file += line
+
+    if not args.keep_non_english:
+        already_check_lang = lang_check(file[:100])
+
     file = splitter(file)
     if args.split_by == "paragraph":
         file = [line + "\n" for line in file]
 
     wd_count = 0
     for line in file:
-        start = time.time()
         sub_file += line
         wd_count += len(whitespace_tokenize(line))
         if wd_count >= args.max_seq_len:
-            tokenize_timer += time.time() - start
-            start = time.time()
-            if filter_doc(doc=sub_file, args=args):
-                check_timer += time.time() - start
+            if filter_doc(doc=sub_file, args=args, lang=already_check_lang):
                 json_data = {args.json_key: sub_file}
                 buff.append(json.dumps(json_data))
             sub_file = ""
             wd_count = 0
-    start = time.time()
-    if sub_file != "" and filter_doc(doc=sub_file, args=args):
-        check_timer += time.time() - start
+    if sub_file != "" and filter_doc(doc=sub_file, args=args, lang=already_check_lang):
         json_data = {args.json_key: sub_file}
         buff.append(json.dumps(json_data))
-
-    print(f'check time = {check_timer}, token_time = {tokenize_timer}, length effectivity = {tokenize_timer / check_timer}')
 
     with open(f"{args.output_dir}/books_{filename}.json", 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
