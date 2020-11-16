@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import argparse
 from tqdm import tqdm
 import nltk
@@ -99,17 +100,24 @@ def process_book(filename, parent_dir, args, splitter):
 
     wd_count = 0
     for line in file:
+        start = time.time()
         sub_file += line
         wd_count += len(whitespace_tokenize(line))
         if wd_count >= args.max_seq_len:
+            print(f'tokenized elapsed {time.time() - start}')
+            start = time.time()
             if filter_doc(doc=sub_file, args=args):
+                print(f'check elapsed = {time.time() - start}')
                 json_data = {args.json_key: sub_file}
                 buff.append(json.dumps(json_data))
             sub_file = ""
             wd_count = 0
+    start = time.time()
     if sub_file != "" and filter_doc(doc=sub_file, args=args):
+        print(f'check elapsed = {time.time() - start}')
         json_data = {args.json_key: sub_file}
         buff.append(json.dumps(json_data))
+
 
     with open(f"{args.output_dir}/books_{filename}.json", 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
