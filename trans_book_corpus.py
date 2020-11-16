@@ -34,6 +34,8 @@ def parse_args():
     group = parser.add_argument_group(title='cleaning data')
     group.add_argument('--remove-lines', type=int, default=60,
                        help='Skip the first n lines')
+    group.add_argument('--remove-ends', type=int, default=10,
+                       help='Skip the last n lines')
     group.add_argument('--split-by', type=str, default="sentence",
                        choices=['sentence', 'paragraph'])
     group.add_argument('--remove-empty-lines', action='store_true')
@@ -107,6 +109,8 @@ def process_book(filename, parent_dir, args, splitter):
     file = splitter(file)
     if args.split_by == "paragraph":
         file = [line + "\n" for line in file]
+
+    file = file[:args.remove_ends]
 
     if not args.keep_non_english:
         already_check_lang = lang_check(file)
