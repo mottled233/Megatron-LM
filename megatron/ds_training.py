@@ -34,7 +34,7 @@ from megatron.checkpointing import load_checkpoint
 from megatron.checkpointing import save_checkpoint
 from megatron.fp16 import FP16_Module
 from megatron.fp16 import FP16_Optimizer
-from megatron.initialize import _write_args_to_tensorboard, set_global_variables, _set_random_seed
+from megatron.initialize import initialize_deepspeed_megatron
 from megatron.learning_rates import AnnealingLR
 from megatron.model import DistributedDataParallel as LocalDDP
 from megatron.model import get_params_for_weight_decay_optimization
@@ -69,19 +69,10 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
         args_defaults: a dictionary from argument-name to argument-value. It
             to set already parse arguments.
     """
-    # Disable CuDNN.
-    torch.backends.cudnn.enabled = False
 
-    # Initalize and get arguments, timers, and Tensorboard writer.
-    set_global_variables(extra_args_provider=extra_args_provider,
-                         args_defaults=args_defaults,
-                         ignore_unknown_args=False)
-
+    initialize_deepspeed_megatron(extra_args_provider=extra_args_provider,
+                        args_defaults=args_defaults)
     args = get_args()
-    initialize_distribution(args)
-    if args.rank == 0:
-        print('> setting random seeds to {} ...'.format(args.seed))
-    _set_random_seed(args.seed)
 
     timers = get_timers()
 
@@ -123,68 +114,6 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
         evaluate_and_print_results(prefix, forward_step_func,
                                    test_data_iterator, model,
                                    0, True)
-
-
-'''
-    Optional DeepSpeed Activation Checkpointing features
-    Gives access to partition activations, contiguous memory optimizations
-    and cpu checkpointing.
-
-    Activation checkpoint requires keep track of the random states
-    and setting the random seed for each MP process. Megatron uses
-    mpu.get_cuda_rng_tracker and mpu.model_parallel_cuda_manual_seed
-    for keeping track of the random states and setting the random seeds.
-    Since they are used in places outside of activation checkpointing,
-    we overwrite them to maintain consistency.
-
-    This must be done before all the calls to mpu.model_parallel_cuda_manual_seed
-'''
-
-
-def set_deepspeed_activation_checkpointing(args):
-    deepspeed.checkpointing.configure(mpu, deepspeed_config=args.deepspeed_config, num_checkpoints=args.num_layers)
-    mpu.checkpoint = deepspeed.checkpointing.checkpoint
-    mpu.get_cuda_rng_tracker = deepspeed.checkpointing.get_cuda_rng_tracker
-    mpu.model_parallel_cuda_manual_seed = deepspeed.checkpointing.model_parallel_cuda_manual_seed
-
-
-def initialize_distribution(args):
-    """Initialize torch.distributed and mpu."""
-
-    # 这里会根据环境变量的配置，可能返回与实际卡数不同
-    device_count = torch.cuda.device_count()
-
-    if args.rank == 0:
-        print('> initializing torch distributed ...', flush=True)
-    # Manually set the device ids.
-    assert device_count > 0, "Need at least 1 gpu to start."
-
-    device = args.rank % device_count
-    if args.local_rank is not None:
-        assert args.local_rank == device, \
-            'expected local-rank to be the same as rank % device-count.'
-    else:
-        args.local_rank = device
-
-    torch.cuda.set_device(device)
-    # Call the init process
-    init_method = 'tcp://'
-    master_ip = os.getenv('MASTER_ADDR', 'localhost')
-    master_port = os.getenv('MASTER_PORT', '6000')
-    init_method += master_ip + ':' + master_port
-    print(f"init: {init_method} by rank{args.rank} local{args.local_rank}")
-    torch.distributed.init_process_group(
-        backend=args.distributed_backend,
-        world_size=args.world_size, rank=args.rank,
-        init_method=init_method)
-
-    # Set the model-parallel / data-parallel communicators.
-    mpu.initialize_model_parallel(args.model_parallel_size)
-
-    # Optional DeepSpeed Activation Checkpointing Features
-    #
-    if args.deepspeed and args.deepspeed_activation_checkpointing:
-        set_deepspeed_activation_checkpointing(args)
 
 
 def get_model(model_provider_func):

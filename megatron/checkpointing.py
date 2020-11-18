@@ -197,35 +197,53 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
 
     if args.deepspeed:
 
-        checkpoint_name, sd = model.load_checkpoint(args.load, iteration)
+        checkpoint_name, state_dict = model.load_checkpoint(args.load, iteration)
 
         if checkpoint_name is None:
             if mpu.get_data_parallel_rank() == 0:
                 print("Unable to load checkpoint.")
             return iteration
 
-    if isinstance(model, torchDDP):
-        model = model.module
+    else:
+        if isinstance(model, torchDDP):
+            model = model.module
 
-    # Checkpoint.
-    checkpoint_name = get_checkpoint_name(load_dir, iteration, release)
-    if mpu.get_data_parallel_rank() == 0:
-        print('global rank {} is loading checkpoint {}'.format(
-            torch.distributed.get_rank(), checkpoint_name))
+        # Checkpoint.
+        checkpoint_name = get_checkpoint_name(load_dir, iteration, release)
+        if mpu.get_data_parallel_rank() == 0:
+            print('global rank {} is loading checkpoint {}'.format(
+                torch.distributed.get_rank(), checkpoint_name))
 
-    # Load the checkpoint.
-    try:
-        state_dict = torch.load(checkpoint_name, map_location='cpu')
-    except ModuleNotFoundError:
-        # For backward compatibility.
-        print_rank_0(' > deserializing using the old code structure ...')
-        sys.modules['fp16.loss_scaler'] = sys.modules[
-            'megatron.fp16.loss_scaler']
-        state_dict = torch.load(checkpoint_name, map_location='cpu')
-        sys.modules.pop('fp16.loss_scaler', None)
-    except BaseException:
-        print_rank_0('could not load the checkpoint')
-        sys.exit()
+        # Load the checkpoint.
+        try:
+            state_dict = torch.load(checkpoint_name, map_location='cpu')
+        except ModuleNotFoundError:
+            # For backward compatibility.
+            print_rank_0(' > deserializing using the old code structure ...')
+            sys.modules['fp16.loss_scaler'] = sys.modules[
+                'megatron.fp16.loss_scaler']
+            state_dict = torch.load(checkpoint_name, map_location='cpu')
+            sys.modules.pop('fp16.loss_scaler', None)
+        except BaseException:
+            print_rank_0('could not load the checkpoint')
+            sys.exit()
+
+        # Model.
+        model.load_state_dict(state_dict['model'])
+
+        # Optimizer.
+        if not release and not args.finetune and not args.no_load_optim:
+            try:
+                if optimizer is not None:
+                    optimizer.load_state_dict(state_dict['optimizer'])
+                if lr_scheduler is not None:
+                    lr_scheduler.load_state_dict(state_dict['lr_scheduler'])
+            except KeyError:
+                print_rank_0('Unable to load optimizer from checkpoint {}. '
+                             'Specify --no-load-optim or --finetune to prevent '
+                             'attempting to load the optimizer state, '
+                             'exiting ...'.format(checkpoint_name))
+                sys.exit()
 
     # set checkpoint version
     set_checkpoint_version(state_dict.get('checkpoint_version', 0))
@@ -244,7 +262,6 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
                              'iteration from checkpoint {}, exiting'.format(
                                  checkpoint_name))
                 sys.exit()
- 
 
     # Check arguments.
     if 'args' in state_dict:
@@ -252,23 +269,6 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
         check_checkpoint_args(checkpoint_args)
     else:
         print_rank_0('could not find arguments in the checkpoint ...')
-
-    # Model.
-    model.load_state_dict(state_dict['model'])
-
-    # Optimizer.
-    if not release and not args.finetune and not args.no_load_optim:
-        try:
-            if optimizer is not None:
-                optimizer.load_state_dict(state_dict['optimizer'])
-            if lr_scheduler is not None:
-                lr_scheduler.load_state_dict(state_dict['lr_scheduler'])
-        except KeyError:
-            print_rank_0('Unable to load optimizer from checkpoint {}. '
-                         'Specify --no-load-optim or --finetune to prevent '
-                         'attempting to load the optimizer state, '
-                         'exiting ...'.format(checkpoint_name))
-            sys.exit()
 
     # rng states.
     if not release and not args.finetune and not args.no_load_rng:
