@@ -7,7 +7,7 @@ NUM_WORKERS=4
 NUM_GPUS_PER_WORKER=8
 
 DATA_PATH=/cfs/aidenliang/corpus/wiki_data/db/wiki_and_book_text_sentence
-CHECKPOINT_PATH=/cfs/aidenliang/checkpoints/ds_megatron_grad_acc_test
+CHECKPOINT_PATH=/cfs/aidenliang/checkpoints/ds_megatron_save
 
 script_path=$(realpath $0)
 script_dir=$(dirname $script_path)
@@ -24,7 +24,7 @@ bert_options=" \
        --grad-acc-step 64 \
        --seq-length 512 \
        --max-position-embeddings 512 \
-       --train-iters 10000 \
+       --train-iters 15000 \
        --save ${CHECKPOINT_PATH} \
        --load ${CHECKPOINT_PATH} \
        --data-path ${DATA_PATH} \
@@ -35,7 +35,7 @@ bert_options=" \
        --lr 2e-3 \
        --lr-decay-style linear \
        --min-lr 1.0e-4 \
-       --lr-decay-iters 7500 \
+       --lr-decay-iters 15000 \
        --weight-decay 1e-2 \
        --clip-grad 1.0 \
        --warmup .01 \
