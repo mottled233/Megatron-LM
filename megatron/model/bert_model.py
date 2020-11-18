@@ -190,11 +190,14 @@ class BertModel(MegatronModule):
 
     def load_state_dict(self, state_dict, strict=True):
         """Customized load."""
-
-        self.language_model.load_state_dict(
-            state_dict[self._language_model_key], strict=strict)
-        self.lm_head.load_state_dict(
-            state_dict[self._lm_head_key], strict=strict)
-        if self.add_binary_head:
-            self.binary_head.load_state_dict(
-                state_dict[self._binary_head_key], strict=strict)
+        args = get_args()
+        if args.deepspeed:
+            super().load_state_dict(state_dict, strict)
+        else:
+            self.language_model.load_state_dict(
+                state_dict[self._language_model_key], strict=strict)
+            self.lm_head.load_state_dict(
+                state_dict[self._lm_head_key], strict=strict)
+            if self.add_binary_head:
+                self.binary_head.load_state_dict(
+                    state_dict[self._binary_head_key], strict=strict)
