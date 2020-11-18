@@ -17,7 +17,7 @@
 
 import torch
 
-from megatron import get_args
+from megatron import get_args, print_rank_0
 from megatron import mpu
 from megatron.model.language_model import parallel_lm_logits
 from megatron.model.language_model import get_language_model
@@ -192,6 +192,7 @@ class BertModel(MegatronModule):
         """Customized load."""
         args = get_args()
         if args.deepspeed:
+            print_rank_0(state_dict)
             super().load_state_dict(state_dict, strict)
         else:
             self.language_model.load_state_dict(
