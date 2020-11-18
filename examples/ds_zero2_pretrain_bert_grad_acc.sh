@@ -24,7 +24,7 @@ bert_options=" \
        --grad-acc-step 64 \
        --seq-length 512 \
        --max-position-embeddings 512 \
-       --train-iters 7500 \
+       --train-iters 10000 \
        --save ${CHECKPOINT_PATH} \
        --load ${CHECKPOINT_PATH} \
        --data-path ${DATA_PATH} \
@@ -35,7 +35,7 @@ bert_options=" \
        --lr 2e-3 \
        --lr-decay-style linear \
        --min-lr 1.0e-4 \
-       --lr-decay-iters 7500 \
+       --lr-decay-iters 10000 \
        --weight-decay 1e-2 \
        --clip-grad 1.0 \
        --warmup .01 \
