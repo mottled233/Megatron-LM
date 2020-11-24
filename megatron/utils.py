@@ -89,7 +89,7 @@ def check_adlr_autoresume_termination(iteration, model,
         sys.exit(0)
 
 
-def make_data_loader(dataset):
+def make_data_loader(dataset, batch_size=None):
     """Buld dataloader given an input dataset."""
     if dataset is None:
         return None
@@ -98,7 +98,7 @@ def make_data_loader(dataset):
     # Data parallel arguments.
     world_size = mpu.get_data_parallel_world_size()
     rank = mpu.get_data_parallel_rank()
-    global_batch_size = args.batch_size * world_size
+    global_batch_size = args.batch_size * world_size if batch_size is None else batch_size * world_size
     num_workers = args.num_workers
 
     # Use a simple sampler with distributed batch sampler.

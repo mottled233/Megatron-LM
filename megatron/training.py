@@ -513,6 +513,8 @@ def evaluate_and_print_results(prefix, forward_step_func,
 
 def build_train_valid_test_data_iterators(
         build_train_valid_test_datasets_provider):
+
+    # 会有读取checkpoint时，数据重复从第一条读取的风险
     """XXX"""
     args = get_args()
 
