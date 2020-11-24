@@ -32,6 +32,7 @@ from transformers.data.metrics.squad_metrics import (
     compute_predictions_logits,
     squad_evaluate,
 )
+from transformers import AutoTokenizer
 
 import os
 
@@ -64,7 +65,7 @@ def parse_args(parser):
 def train_valid_datasets_provider():
     """Provide train and validation datasets."""
     args = get_args()
-    tokenizer = get_tokenizer()
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
     # batch: all_input_ids, all_attention_masks, all_token_type_ids, all_start_positions,
     #                 all_end_positions, all_cls_index, all_p_mask, all_is_impossible,
@@ -145,7 +146,7 @@ def metrics_func_provider():
     tokenizer = get_tokenizer()
     # batch: all_input_ids, all_attention_masks, all_token_type_ids, all_feature_index, all_cls_index, all_p_mask
     test_dataset, test_examples, test_features\
-        = load_and_cache_examples(args, tokenizer, stage="test", output_examples=True)
+        = load_and_cache_examples(args, AutoTokenizer.from_pretrained("bert-base-uncased"), stage="test", output_examples=True)
 
     if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
         os.makedirs(args.output_dir)
