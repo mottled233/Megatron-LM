@@ -24,6 +24,7 @@ python -m torch.distributed.launch $DISTRIBUTED_ARGS \
        --seq-length 512 \
        --max-position-embeddings 512 \
        --vocab-file bert-vocab.txt \
+       --tokenizer-type BertWordPieceLowerCase\
        --distributed-backend nccl \
        --lr 0.0001 \
        --lr-decay-style linear \
