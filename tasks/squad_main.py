@@ -40,10 +40,10 @@ def get_tasks_args(parser, task_parser_func=None):
     group.add_argument('--keep-last', action='store_true',
                        help='Keep the last batch (maybe incomplete) in'
                        'the data loader')
-    group.add_argument('--train-data', nargs='+', default=None,
+    group.add_argument('--train-data', default=None,
                        help='Whitespace separated paths or corpora names '
                        'for training.')
-    group.add_argument('--valid-data', nargs='*', default=None,
+    group.add_argument('--valid-data', default=None,
                        help='path(s) to the validation data.')
     group.add_argument('--overlapping-eval', type=int, default=32,
                        help='Sliding window for overlapping evaluation.')
