@@ -8,7 +8,7 @@ NNODES=1
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NNODES))
 
-DATA_PATH=/cfs/aidenliang//corpus/squad
+DATA_PATH=/cfs/aidenliang/corpus/squad
 CHECKPOINT_PATH=/cfs/aidenliang/checkpoints/ds_megatron_save
 OUTPUT_PATH=/cfs/aidenliang/output/squad
 
