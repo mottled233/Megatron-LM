@@ -238,7 +238,10 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
             sys.exit()
 
         # Model.
-        model.load_state_dict(state_dict['model'])
+        if 'model' in state_dict:
+            model.load_state_dict(state_dict['model'])
+        elif 'module' in state_dict:
+            model.load_state_dict(state_dict['module'])
 
         # Optimizer.
         if not release and not args.finetune and not args.no_load_optim:
