@@ -70,12 +70,20 @@ def ensure_directory_exists(filename):
 
 
 def get_checkpoint_name(checkpoints_path, iteration,
-                        release=False, mp_rank=None):
+                        release=False, mp_rank=None, deepspeed=False):
     """A unified checkpoint name."""
     if release:
         directory = 'release'
+    elif deepspeed:
+        directory = str(iteration)
     else:
         directory = 'iter_{:07d}'.format(iteration)
+    if deepspeed:
+        return os.path.join(checkpoints_path, directory,
+                            ('mp_rank_{:02d}'.format(
+                                mpu.get_model_parallel_rank() if mp_rank is None
+                                else mp_rank))
+                            + 'model_states.pt')
     return os.path.join(checkpoints_path, directory,
                         'mp_rank_{:02d}'.format(
                             mpu.get_model_parallel_rank() if mp_rank is None
@@ -209,7 +217,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
             model = model.module
 
         # Checkpoint.
-        checkpoint_name = get_checkpoint_name(load_dir, iteration, release)
+        checkpoint_name = get_checkpoint_name(load_dir, iteration, release, deepspeed=True)
         if mpu.get_data_parallel_rank() == 0:
             print('global rank {} is loading checkpoint {}'.format(
                 torch.distributed.get_rank(), checkpoint_name))
