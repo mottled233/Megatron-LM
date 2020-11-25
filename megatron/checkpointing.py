@@ -88,7 +88,7 @@ def get_checkpoint_name(checkpoints_path, iteration,
                         'mp_rank_{:02d}'.format(
                             mpu.get_model_parallel_rank() if mp_rank is None
                             else mp_rank),
-                        'model_optim_rng.pt')
+                        '_model_optim_rng.pt')
 
 
 def get_checkpoint_tracker_filename(checkpoints_path):
