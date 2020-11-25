@@ -135,7 +135,7 @@ def test_step(batch, model):
     timers('batch generator').stop()
 
     outputs = model(input_ids, attention_mask, token_type_ids)
-    # torch.distributed.all_reduce(feature_indices)
+    mpu.mappings._gather(feature_indices)
     return feature_indices, outputs
 
 
@@ -214,7 +214,7 @@ def metrics_func_provider():
                 args.verbose_logging,
                 False,  # args.version_2_with_negative,
                 args.null_score_diff_threshold,
-                tokenizer,
+                BertTokenizer.from_pretrained("bert-base-uncased"),
             )
 
             # Compute the F1 and exact scores.
