@@ -15,7 +15,14 @@
 
 import torch
 
-from .initialize import get_model_parallel_group, get_model_parallel_world_size, get_model_parallel_rank
+from .initialize import (
+    get_model_parallel_group,
+    get_model_parallel_world_size,
+    get_model_parallel_rank,
+    get_data_parallel_rank,
+    get_data_parallel_group,
+    get_data_parallel_world_size,
+)
 from .utils import split_tensor_along_last_dim
 
 
@@ -51,21 +58,22 @@ def _split(input_):
     return output
 
 
-def _gather(input_):
+def _gather(input_, parallel_mode="model"):
     """Gather tensors and concatinate along the last dimension."""
 
-    world_size = get_model_parallel_world_size()
+    world_size = get_model_parallel_world_size() if parallel_mode == "model" else get_data_parallel_world_size()
     # Bypass the function if we are using only 1 GPU.
     if world_size==1:
         return input_
 
     # Size and dimension.
     last_dim = input_.dim() - 1
-    rank = get_model_parallel_rank()
+    rank = get_model_parallel_rank() if parallel_mode == "model" else get_data_parallel_rank()
+    group = get_model_parallel_group() if parallel_mode == "model" else get_data_parallel_group()
 
     tensor_list = [torch.empty_like(input_) for _ in range(world_size)]
     tensor_list[rank] = input_
-    torch.distributed.all_gather(tensor_list, input_, group=get_model_parallel_group())
+    torch.distributed.all_gather(tensor_list, input_, group=group)
 
     # Note: torch.cat already creates a contiguous tensor.
     output = torch.cat(tensor_list, dim=last_dim).contiguous()

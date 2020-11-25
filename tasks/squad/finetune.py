@@ -135,7 +135,8 @@ def test_step(batch, model):
     timers('batch generator').stop()
 
     outputs = model(input_ids, attention_mask, token_type_ids)
-    # mpu.mappings._gather(feature_indices)
+    # feature_indices = mpu.mappings._gather(feature_indices, "data")
+    # outputs = (mpu.mappings._gather(output, "data") for output in outputs)
     return feature_indices, outputs
 
 
@@ -161,7 +162,7 @@ def metrics_func_provider():
     for iteration_, batch in enumerate(test_dataloader):
         if iteration_ < 3:
             indices = batch[3].cuda().contiguous()
-            indices = mpu.mappings._gather(indices)
+            indices = mpu.mappings._gather(indices, "data")
             print(f"rank {mpu.get_data_parallel_rank()} batch feature {indices}")
 
     def test_model_func(model, epoch=-1, output_predictions=True):
