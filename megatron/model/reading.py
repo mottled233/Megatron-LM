@@ -161,4 +161,4 @@ class SQUAD(MegatronModule):
         else:
             print_rank_0('***WARNING*** could not find {} in the checkpoint, '
                          'initializing to random'.format(
-                             self._classification_head_key))
+                             self._perdiction_layer_key))
