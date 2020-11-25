@@ -194,7 +194,7 @@ def get_checkpoint_iteration(args):
     return iteration, release, True
 
 
-def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
+def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', deepspeed=False):
     """Load a model checkpoint and return the iteration."""
     args = get_args()
     load_dir = getattr(args, load_arg)
@@ -217,7 +217,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
             model = model.module
 
         # Checkpoint.
-        checkpoint_name = get_checkpoint_name(load_dir, iteration, release, deepspeed=True)
+        checkpoint_name = get_checkpoint_name(load_dir, iteration, release, deepspeed=deepspeed or args.deepspeed)
         if mpu.get_data_parallel_rank() == 0:
             print('global rank {} is loading checkpoint {}'.format(
                 torch.distributed.get_rank(), checkpoint_name))
