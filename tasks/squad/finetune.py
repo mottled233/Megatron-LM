@@ -25,11 +25,10 @@ from megatron.model.reading import SQUAD
 from megatron.utils import reduce_losses
 from tasks.eval_utils import accuracy_func_provider
 from tasks.finetune_utils import finetune, build_data_loader
-from tasks.squad.data import load_and_cache_examples, to_list
+from tasks.squad.data import load_and_cache_examples, to_list, compute_predictions_logits
 
 from transformers.data.processors.squad import SquadResult
 from transformers.data.metrics.squad_metrics import (
-    compute_predictions_logits,
     squad_evaluate,
 )
 from transformers import BertTokenizer
@@ -136,7 +135,7 @@ def test_step(batch, model):
     timers('batch generator').stop()
 
     outputs = model(input_ids, attention_mask, token_type_ids)
-
+    torch.distributed.all_reduce(feature_indices)
     return feature_indices, outputs
 
 
@@ -160,6 +159,7 @@ def metrics_func_provider():
     test_dataloader = make_data_loader(test_dataset, batch_size=args.test_batch_size_)
     for iteration_, batch in enumerate(test_dataloader):
         if iteration_ < 3:
+            torch.distributed.all_reduce(batch[3])
             print(f"rank {mpu.get_data_parallel_rank()} batch feature {batch[3]}")
 
     def test_model_func(model, epoch=-1, output_predictions=True):
