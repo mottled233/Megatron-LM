@@ -161,7 +161,7 @@ def metrics_func_provider():
     for iteration_, batch in enumerate(test_dataloader):
         if iteration_ < 3:
             indices = batch[3].cuda().contiguous()
-            torch.distributed.all_reduce(indices)
+            indices = mpu.mappings._gather(indices)
             print(f"rank {mpu.get_data_parallel_rank()} batch feature {indices}")
 
     def test_model_func(model, epoch=-1, output_predictions=True):
