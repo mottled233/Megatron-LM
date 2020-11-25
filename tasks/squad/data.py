@@ -3,16 +3,12 @@ import os
 from megatron import print_rank_0
 
 import collections
-import logging
 import json
 from transformers import BasicTokenizer
 import math
 import transformers
 from transformers import squad_convert_examples_to_features
 from transformers.data.processors.squad import SquadV1Processor, SquadV2Processor
-
-
-logger = logging.get_logger(__name__)
 
 
 def to_list(tensor):

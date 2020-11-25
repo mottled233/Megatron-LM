@@ -152,67 +152,75 @@ def metrics_func_provider():
 
     # Note that DistributedSampler samples randomly, but does it matter?
     # args.test_batch_size_ = max(1, mpu.get_data_parallel_world_size()) * args.test_batch_size
-    # test_sampler = SequentialSampler(test_dataset)
-    # test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.test_batch_size_)
-
     args.test_batch_size_ = args.test_batch_size
-    test_dataloader = make_data_loader(test_dataset, batch_size=args.test_batch_size_)
+    test_sampler = SequentialSampler(test_dataset)
+    test_dataloader = DataLoader(test_dataset, sampler=test_sampler, batch_size=args.test_batch_size_)
+
+    # args.test_batch_size_ = args.test_batch_size
+    # test_dataloader = make_data_loader(test_dataset, batch_size=args.test_batch_size_)
     for iteration_, batch in enumerate(test_dataloader):
         if iteration_ < 3:
             torch.distributed.all_reduce(batch[3])
             print(f"rank {mpu.get_data_parallel_rank()} batch feature {batch[3]}")
 
     def test_model_func(model, epoch=-1, output_predictions=True):
-        model.eval()
-        all_results = []
-        # For all the batches in the dataset.
-        timers = get_timers()
+        if args.rank not in [-1, 0]:
+            # Make sure only the first process in distributed test process the dataset,
+            # and the others will skip it
+            torch.distributed.barrier()
+        else:
+            model.eval()
+            all_results = []
+            # For all the batches in the dataset.
+            timers = get_timers()
 
-        for iteration_, batch in enumerate(test_dataloader):
-            timers("test iter").start()
-            # Predict with bert
-            feature_indices, outputs = test_step(batch, model)
+            for iteration_, batch in enumerate(test_dataloader):
+                timers("test iter").start()
+                # Predict with bert
+                feature_indices, outputs = test_step(batch, model)
 
-            # Processing the output
-            for i, feature_index in enumerate(feature_indices):
-                eval_feature = test_features[feature_index.item()]
-                unique_id = int(eval_feature.unique_id)
+                # Processing the output
+                for i, feature_index in enumerate(feature_indices):
+                    eval_feature = test_features[feature_index.item()]
+                    unique_id = int(eval_feature.unique_id)
 
-                output = [to_list(output[i]) for output in outputs]
+                    output = [to_list(output[i]) for output in outputs]
 
-                start_logits, end_logits = output
-                result = SquadResult(unique_id, start_logits, end_logits)
+                    start_logits, end_logits = output
+                    result = SquadResult(unique_id, start_logits, end_logits)
 
-                all_results.append(result)
-            timers("test iter").stop()
+                    all_results.append(result)
+                timers("test iter").stop()
 
-            if iteration_+1 % args.log_interval == 0:
-                time_per_iter = timers('test iter').elapsed() / args.test_batch_size_
-                print_rank_0(f"Test iter {iteration_} finished, times per iter: {time_per_iter}")
+                if iteration_+1 % args.log_interval == 0:
+                    time_per_iter = timers('test iter').elapsed() / args.test_batch_size_
+                    print_rank_0(f"Test iter {iteration_} finished, times per iter: {time_per_iter}")
 
-        # Compute predictions
-        output_prediction_file = os.path.join(args.output_dir, "predictions_epoch{}.json".format(epoch))
-        output_nbest_file = os.path.join(args.output_dir, "nbest_predictions_epoch{}.json".format(epoch))
-        output_null_log_odds_file = None
-        predictions = compute_predictions_logits(
-            test_examples,
-            test_features,
-            all_results,
-            args.n_best_size,
-            args.max_answer_length,
-            True,  # args.do_lower_case,
-            output_prediction_file,
-            output_nbest_file,
-            output_null_log_odds_file,
-            args.verbose_logging,
-            False,  # args.version_2_with_negative,
-            args.null_score_diff_threshold,
-            tokenizer,
-        )
+            # Compute predictions
+            output_prediction_file = os.path.join(args.output_dir, "predictions_epoch{}.json".format(epoch))
+            output_nbest_file = os.path.join(args.output_dir, "nbest_predictions_epoch{}.json".format(epoch))
+            output_null_log_odds_file = None
+            predictions = compute_predictions_logits(
+                test_examples,
+                test_features,
+                all_results,
+                args.n_best_size,
+                args.max_answer_length,
+                True,  # args.do_lower_case,
+                output_prediction_file,
+                output_nbest_file,
+                output_null_log_odds_file,
+                args.verbose_logging,
+                False,  # args.version_2_with_negative,
+                args.null_score_diff_threshold,
+                tokenizer,
+            )
 
-        # Compute the F1 and exact scores.
-        results = squad_evaluate(test_examples, predictions)
-        print_rank_0(f"Epoch {epoch} test results: {results}")
+            # Compute the F1 and exact scores.
+            results = squad_evaluate(test_examples, predictions)
+            print_rank_0(f"Epoch {epoch} test results: {results}")
+            if args.rank == 0:
+                torch.distributed.barrier()
 
     return test_model_func
 
