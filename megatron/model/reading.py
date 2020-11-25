@@ -125,8 +125,7 @@ class SQUAD(MegatronModule):
 
     def forward(self, input_ids, attention_mask, tokentype_ids, return_yp=False):
 
-        extended_attention_mask = bert_extended_attention_mask(
-            attention_mask, next(self.language_model.parameters()).dtype)
+        extended_attention_mask = bert_extended_attention_mask(attention_mask)
         position_ids = bert_position_ids(input_ids)
 
         input_state, pooled_output = self.language_model(input_ids,
