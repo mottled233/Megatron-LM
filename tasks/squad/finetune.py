@@ -135,7 +135,7 @@ def test_step(batch, model):
     timers('batch generator').stop()
 
     outputs = model(input_ids, attention_mask, token_type_ids)
-    torch.distributed.all_reduce(feature_indices)
+    # torch.distributed.all_reduce(feature_indices)
     return feature_indices, outputs
 
 
@@ -160,8 +160,9 @@ def metrics_func_provider():
     # test_dataloader = make_data_loader(test_dataset, batch_size=args.test_batch_size_)
     for iteration_, batch in enumerate(test_dataloader):
         if iteration_ < 3:
-            torch.distributed.all_reduce(batch[3])
-            print(f"rank {mpu.get_data_parallel_rank()} batch feature {batch[3]}")
+            indices = batch[3].cuda().contiguous()
+            torch.distributed.all_reduce(indices)
+            print(f"rank {mpu.get_data_parallel_rank()} batch feature {indices}")
 
     def test_model_func(model, epoch=-1, output_predictions=True):
         if args.rank not in [-1, 0]:
