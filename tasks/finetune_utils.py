@@ -247,13 +247,13 @@ def finetune(train_valid_datasets_provider, model_provider,
     print_rank_0('training ...')
 
     # Finetune the model.
-    if args.epochs > 0:
-        _train(model, optimizer, lr_scheduler, forward_step,
-               train_dataloader, valid_dataloader, end_of_epoch_callback)
-    # Or just evaluate.
-    else:
-        if end_of_epoch_callback is not None:
-            print_rank_0('evaluation only mode, setting epoch to -1')
-            end_of_epoch_callback(model, epoch=-1, output_predictions=True)
+    # if args.epochs > 0:
+    #     _train(model, optimizer, lr_scheduler, forward_step,
+    #            train_dataloader, valid_dataloader, end_of_epoch_callback)
+    # # Or just evaluate.
+    # else:
+    if end_of_epoch_callback is not None:
+        print_rank_0('evaluation only mode, setting epoch to -1')
+        end_of_epoch_callback(model, epoch=-1, output_predictions=True)
 
     print_rank_0('done :-)')
