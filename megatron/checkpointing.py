@@ -224,7 +224,8 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load'):
                 'megatron.fp16.loss_scaler']
             state_dict = torch.load(checkpoint_name, map_location='cpu')
             sys.modules.pop('fp16.loss_scaler', None)
-        except BaseException:
+        except BaseException as e:
+            print_rank_0(e)
             print_rank_0('could not load the checkpoint')
             sys.exit()
 
