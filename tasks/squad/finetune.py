@@ -135,7 +135,7 @@ def test_step(batch, model):
     timers('batch generator').stop()
 
     outputs = model(input_ids, attention_mask, token_type_ids)
-    mpu.mappings._gather(feature_indices)
+    # mpu.mappings._gather(feature_indices)
     return feature_indices, outputs
 
 
