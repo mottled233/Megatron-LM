@@ -43,7 +43,11 @@ def load_and_cache_examples(args, tokenizer, stage="train", output_examples=Fals
             examples = processor.get_train_examples(args.data_dir, filename=args.train_data)
         else:
             examples = processor.get_dev_examples(args.data_dir, filename=args.valid_data)
-        print_rank_0(examples[0].answer_text)
+        blank_cnt = 0
+        for exam in examples:
+            if exam.answer_text is None:
+                blank_cnt += 1
+        print_rank_0(blank_cnt)
         print_rank_0(examples[0].answers)
         features, dataset = squad_convert_examples_to_features(
             examples=examples,
