@@ -215,5 +215,5 @@ def metrics_func_provider():
 
 
 def main():
-    finetune(train_valid_datasets_provider, model_provider,
+    finetune(train_valid_datasets_provider, model_provider, forward_step=forward_step,
              end_of_epoch_callback_provider=metrics_func_provider)
