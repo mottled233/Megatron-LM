@@ -161,9 +161,13 @@ def metrics_func_provider():
     # test_dataloader = make_data_loader(test_dataset, batch_size=args.test_batch_size_)
     # for iteration_, batch in enumerate(test_dataloader):
     #     if iteration_ < 3:
-    #         indices = batch[3].cuda().contiguous()
-    #         indices = mpu.mappings._gather(indices, "data")
+    #         indices = batch[0]
+    #
     #         print(f"rank {mpu.get_data_parallel_rank()} batch feature {indices}")
+
+    if args.rank not in [-1, 0]:
+        for i in range(3):
+            print(test_features[i])
 
     def test_model_func(model, epoch=-1, output_predictions=True):
         if args.rank not in [-1, 0]:
