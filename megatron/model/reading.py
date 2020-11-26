@@ -101,7 +101,7 @@ class SimplePredictionLayer(MegatronModule):
 
         self.start_head.load_state_dict(
             state_dict[self._start_head_key], strict=strict)
-        self.prediction.load_state_dict(
+        self.end_head.load_state_dict(
             state_dict[self._end_head_key], strict=strict)
 
 
