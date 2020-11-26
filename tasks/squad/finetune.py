@@ -165,7 +165,7 @@ def metrics_func_provider():
     #
     #         print(f"rank {mpu.get_data_parallel_rank()} batch feature {indices}")
 
-    if args.rank not in [-1, 0]:
+    if args.rank in [-1, 0]:
         for i in range(3):
             print_rank_0(test_features[i].input_ids)
             print_rank_0(test_features[i].tokens)
