@@ -66,8 +66,10 @@ def load_and_cache_examples(args, tokenizer, stage="train", output_examples=Fals
         print_rank_0(f"Creating features from dataset file at {input_dir}")
 
         processor = SquadV1Processor()
-        if stage != "test":
+        if stage == "train":
             examples = processor.get_train_examples(args.data_dir, filename=args.train_data)
+        elif stage == "dev":
+            examples = processor.get_train_examples(args.data_dir, filename=args.valid_data)
         else:
             examples = processor.get_dev_examples(args.data_dir, filename=args.valid_data)
         blank_cnt = 0
