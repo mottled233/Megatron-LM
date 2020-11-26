@@ -167,7 +167,9 @@ def metrics_func_provider():
 
     if args.rank not in [-1, 0]:
         for i in range(3):
-            print(test_features[i])
+            print(test_features[i].input_ids)
+            print(test_features[i].tokens)
+            print(test_features[i].token_to_orig_map)
 
     def test_model_func(model, epoch=-1, output_predictions=True):
         if args.rank not in [-1, 0]:

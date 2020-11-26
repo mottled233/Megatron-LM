@@ -97,6 +97,7 @@ class SimplePredictionLayer(MegatronModule):
 
     def load_state_dict(self, state_dict, strict=True):
         """Customized load."""
+        print_rank_0(state_dict)
 
         self.start_head.load_state_dict(
             state_dict[self._start_head_key], strict=strict)
@@ -145,7 +146,7 @@ class SQUAD(MegatronModule):
             = self.language_model.state_dict_for_save_checkpoint(
                 destination, prefix, keep_vars)
         state_dict_[self._perdiction_layer_key] \
-            = self.prediction.state_dict(
+            = self.prediction.state_dict_for_save_checkpoint(
                 destination, prefix, keep_vars)
         return state_dict_
 
