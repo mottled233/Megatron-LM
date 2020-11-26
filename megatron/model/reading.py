@@ -37,11 +37,9 @@ class SimplePredictionLayer(MegatronModule):
 
         self.input_dim = args.hidden_size
 
-        self.start_dropout = torch.nn.Dropout(args.hidden_dropout)
         self.start_head = get_linear_layer(args.hidden_size, 1, init_method)
         self._start_head_key = 'start_pos_head'
 
-        self.end_dropout = torch.nn.Dropout(args.hidden_dropout)
         self.end_head = get_linear_layer(args.hidden_size, 1, init_method)
         self._end_head_key = 'end_pos_head'
 
@@ -63,8 +61,8 @@ class SimplePredictionLayer(MegatronModule):
 
     def forward(self, input_state, return_yp=False):
 
-        start_logits = self.start_head(self.start_dropout(input_state)).squeeze(2)
-        end_logits = self.end_head(self.end_dropout(input_state)).squeeze(2)
+        start_logits = self.start_head(input_state).squeeze(2)
+        end_logits = self.end_head(input_state).squeeze(2)
 
         if return_yp:
             # 找结束位置用的开始和结束位置概率之和
