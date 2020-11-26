@@ -53,6 +53,12 @@ def parse_args(parser):
     group.add_argument('--verbose-logging', action='store_true',
                        help='If set, use verbose log in output prediction.')
     group.add_argument(
+        "--doc-stride",
+        default=256,
+        type=int,
+        help="When splitting up a long document into chunks, how much stride to take between chunks.",
+    )
+    group.add_argument(
         "--null_score_diff_threshold",
         type=float,
         default=0.0,
