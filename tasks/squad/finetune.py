@@ -34,6 +34,7 @@ from transformers.data.metrics.squad_metrics import (
 from transformers import BertTokenizer
 
 import os
+from tqdm import tqdm
 from functools import partial
 
 
@@ -159,7 +160,7 @@ def test_model_func(dataloader, features, examples, model, prefix, args,
         # For all the batches in the dataset.
         timers = get_timers()
 
-        for iteration_, batch in enumerate(dataloader):
+        for iteration_, batch in tqdm(enumerate(dataloader)):
             timers("test iter").start()
             # Predict with bert
             feature_indices, outputs = test_step(batch, model)
