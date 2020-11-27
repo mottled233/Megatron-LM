@@ -93,7 +93,7 @@ def model_provider():
 def compute_loss(start_logits, end_logits, start_position, end_position):
     criterion = torch.nn.CrossEntropyLoss(reduction='mean', ignore_index=-1)
     loss1 = criterion(start_logits, start_position) + criterion(end_logits, end_position)
-    return loss1
+    return loss1.mean()
 
 
 def forward_step(batch, model, return_yp=False):
