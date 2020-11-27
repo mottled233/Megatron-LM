@@ -186,7 +186,7 @@ def _train(model, optimizer, lr_scheduler, forward_step,
             if args.eval_interval and iteration % args.eval_interval == 0:
                 prefix = 'iteration {}'.format(iteration)
                 evaluate_callback(prefix=prefix, forward_step=forward_step,
-                                           valid_dataloader=valid_dataloader, model=model,
+                                           dataloader=valid_dataloader, model=model,
                                            iteration=iteration)
 
         # Checkpointing at the end of each epoch.
