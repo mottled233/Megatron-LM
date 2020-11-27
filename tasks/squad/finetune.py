@@ -34,6 +34,7 @@ from transformers.data.metrics.squad_metrics import (
 from transformers import BertTokenizer
 
 import os
+from functools import partial
 
 
 def parse_args(parser):
@@ -54,7 +55,7 @@ def parse_args(parser):
                        help='If set, use verbose log in output prediction.')
     group.add_argument(
         "--doc-stride",
-        default=256,
+        default=128,
         type=int,
         help="When splitting up a long document into chunks, how much stride to take between chunks.",
     )
@@ -75,7 +76,7 @@ def train_valid_datasets_provider():
     # batch: all_input_ids, all_attention_masks, all_token_type_ids, all_start_positions,
     #                 all_end_positions, all_cls_index, all_p_mask, all_is_impossible,
     train_dataset = load_and_cache_examples(args, tokenizer, stage="train", output_examples=False)
-    valid_dataset = load_and_cache_examples(args, tokenizer, stage="dev", output_examples=False)
+    valid_dataset = load_and_cache_examples(args, tokenizer, stage="test", output_examples=False)
 
     return train_dataset, valid_dataset
 
@@ -146,6 +147,67 @@ def test_step(batch, model):
     return feature_indices, outputs
 
 
+def test_model_func(dataloader, features, examples, model, prefix, args,
+                    forward_step=None, output_predictions=True, epoch=-1, iteration=0):
+    if args.rank not in [-1, 0]:
+        # Make sure only the first process in distributed test process the dataset,
+        # and the others will skip it
+        torch.distributed.barrier()
+    else:
+        model.eval()
+        all_results = []
+        # For all the batches in the dataset.
+        timers = get_timers()
+
+        for iteration_, batch in enumerate(dataloader):
+            timers("test iter").start()
+            # Predict with bert
+            feature_indices, outputs = test_step(batch, model)
+
+            # Processing the output
+            for i, feature_index in enumerate(feature_indices):
+                eval_feature = features[feature_index.item()]
+                unique_id = int(eval_feature.unique_id)
+
+                output = [to_list(output[i]) for output in outputs]
+
+                start_logits, end_logits = output
+                result = SquadResult(unique_id, start_logits, end_logits)
+
+                all_results.append(result)
+            timers("test iter").stop()
+
+            if iteration_+1 % args.log_interval == 0:
+                time_per_iter = timers('test iter').elapsed() / args.test_batch_size_
+                print_rank_0(f"Test iter {iteration_} finished, times per iter: {time_per_iter}")
+
+        # Compute predictions
+        output_prediction_file = os.path.join(args.output_dir, "{}_predictions_epoch{}.json".format(prefix, epoch))
+        output_nbest_file = os.path.join(args.output_dir, "{}_nbest_predictions_epoch{}.json".format(prefix, epoch))
+        output_null_log_odds_file = None
+        predictions = compute_predictions_logits(
+            examples,
+            features,
+            all_results,
+            args.n_best_size,
+            args.max_answer_length,
+            True,  # args.do_lower_case,
+            output_prediction_file,
+            output_nbest_file,
+            output_null_log_odds_file,
+            args.verbose_logging,
+            False,  # args.version_2_with_negative,
+            args.null_score_diff_threshold,
+            BertTokenizer.from_pretrained("bert-base-uncased"),
+        )
+
+        # Compute the F1 and exact scores.
+        results = squad_evaluate(examples, predictions)
+        print_rank_0(f"Epoch {epoch} iteration {iteration} test results: {results}")
+        if args.rank == 0:
+            torch.distributed.barrier()
+
+
 def metrics_func_provider():
     """Privde metrics callback function."""
     args = get_args()
@@ -177,68 +239,32 @@ def metrics_func_provider():
     #         print_rank_0(test_features[i].tokens)
     #         print_rank_0(test_features[i].token_to_orig_map)
 
-    def test_model_func(model, epoch=-1, output_predictions=True):
-        if args.rank not in [-1, 0]:
-            # Make sure only the first process in distributed test process the dataset,
-            # and the others will skip it
-            torch.distributed.barrier()
-        else:
-            model.eval()
-            all_results = []
-            # For all the batches in the dataset.
-            timers = get_timers()
+    metrics_func = partial(test_model_func, dataloader=test_dataloader, features=test_features, examples=test_examples,
+                           prefix="test", args=args)
 
-            for iteration_, batch in enumerate(test_dataloader):
-                timers("test iter").start()
-                # Predict with bert
-                feature_indices, outputs = test_step(batch, model)
+    return metrics_func
 
-                # Processing the output
-                for i, feature_index in enumerate(feature_indices):
-                    eval_feature = test_features[feature_index.item()]
-                    unique_id = int(eval_feature.unique_id)
 
-                    output = [to_list(output[i]) for output in outputs]
+def validate_func_provider():
+    args = get_args()
+    # batch: all_input_ids, all_attention_masks, all_token_type_ids, all_feature_index, all_cls_index, all_p_mask
+    test_dataset, test_examples, test_features \
+        = load_and_cache_examples(args, BertTokenizer.from_pretrained("bert-base-uncased"), stage="test",
+                                  output_examples=True)
 
-                    start_logits, end_logits = output
-                    result = SquadResult(unique_id, start_logits, end_logits)
+    if not os.path.exists(args.output_dir) and args.local_rank in [-1, 0]:
+        os.makedirs(args.output_dir)
 
-                    all_results.append(result)
-                timers("test iter").stop()
+    # Note that DistributedSampler samples randomly, but does it matter?
+    # args.test_batch_size_ = max(1, mpu.get_data_parallel_world_size()) * args.test_batch_size
+    test_sampler = SequentialSampler(test_dataset)
 
-                if iteration_+1 % args.log_interval == 0:
-                    time_per_iter = timers('test iter').elapsed() / args.test_batch_size_
-                    print_rank_0(f"Test iter {iteration_} finished, times per iter: {time_per_iter}")
+    validate_func = partial(test_model_func, features=test_features, examples=test_examples,
+                           args=args)
 
-            # Compute predictions
-            output_prediction_file = os.path.join(args.output_dir, "predictions_epoch{}.json".format(epoch))
-            output_nbest_file = os.path.join(args.output_dir, "nbest_predictions_epoch{}.json".format(epoch))
-            output_null_log_odds_file = None
-            predictions = compute_predictions_logits(
-                test_examples,
-                test_features,
-                all_results,
-                args.n_best_size,
-                args.max_answer_length,
-                True,  # args.do_lower_case,
-                output_prediction_file,
-                output_nbest_file,
-                output_null_log_odds_file,
-                args.verbose_logging,
-                False,  # args.version_2_with_negative,
-                args.null_score_diff_threshold,
-                BertTokenizer.from_pretrained("bert-base-uncased"),
-            )
-
-            # Compute the F1 and exact scores.
-            results = squad_evaluate(test_examples, predictions)
-            print_rank_0(f"Epoch {epoch} test results: {results}")
-            if args.rank == 0:
-                torch.distributed.barrier()
-
-    return test_model_func
+    return validate_func
 
 
 def main():
     finetune(train_valid_datasets_provider, model_provider, forward_step=forward_step,
-             end_of_epoch_callback_provider=metrics_func_provider)
+             end_of_epoch_callback_provider=metrics_func_provider, evaluate_callback_provider=validate_func_provider)

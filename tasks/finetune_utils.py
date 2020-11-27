@@ -124,7 +124,7 @@ def _build_train_valid_dataloaders(train_dataset, valid_dataset):
 
 
 def _train(model, optimizer, lr_scheduler, forward_step,
-           train_dataloader, valid_dataloader, end_of_epoch_callback):
+           train_dataloader, valid_dataloader, end_of_epoch_callback, evaluate_callback):
     """Train the model."""
     args = get_args()
     timers = get_timers()
@@ -185,9 +185,9 @@ def _train(model, optimizer, lr_scheduler, forward_step,
             # Evaluation
             if args.eval_interval and iteration % args.eval_interval == 0:
                 prefix = 'iteration {}'.format(iteration)
-                evaluate_and_print_results(prefix, forward_step,
+                evaluate_callback(prefix, forward_step,
                                            valid_dataloader, model,
-                                           iteration, False)
+                                           iteration)
 
         # Checkpointing at the end of each epoch.
         if args.save:
@@ -195,12 +195,12 @@ def _train(model, optimizer, lr_scheduler, forward_step,
 
         # Callback at the end of each epoch.
         if end_of_epoch_callback is not None:
-            end_of_epoch_callback(model, epoch)
+            end_of_epoch_callback(model=model, epoch=epoch)
 
 
 def finetune(train_valid_datasets_provider, model_provider,
              forward_step=_cross_entropy_forward_step,
-             end_of_epoch_callback_provider=None):
+             end_of_epoch_callback_provider=None, evaluate_callback_provider=None):
     """Main finetune function used across all tasks."""
     args = get_args()
     timers = get_timers()
@@ -218,7 +218,13 @@ def finetune(train_valid_datasets_provider, model_provider,
     end_of_epoch_callback = None
     if end_of_epoch_callback_provider is not None:
         end_of_epoch_callback = end_of_epoch_callback_provider()
+
+    if evaluate_callback_provider is not None:
+        evaluate_func = evaluate_callback_provider()
+    else:
+        evaluate_func = evaluate_and_print_results
     timers('callback function').stop()
+
 
     # Build model, optimizer and learning rate scheduler.
     timers('model and optimizer').start()
@@ -249,11 +255,11 @@ def finetune(train_valid_datasets_provider, model_provider,
     # Finetune the model.
     if args.epochs > 0:
         _train(model, optimizer, lr_scheduler, forward_step,
-               train_dataloader, valid_dataloader, end_of_epoch_callback)
+               train_dataloader, valid_dataloader, end_of_epoch_callback, evaluate_func)
     # Or just evaluate.
     else:
         if end_of_epoch_callback is not None:
             print_rank_0('evaluation only mode, setting epoch to -1')
-            end_of_epoch_callback(model, epoch=-1, output_predictions=True)
+            end_of_epoch_callback(model=model, epoch=-1, output_predictions=True)
 
     print_rank_0('done :-)')
