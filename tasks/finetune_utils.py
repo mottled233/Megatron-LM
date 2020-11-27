@@ -231,7 +231,6 @@ def finetune(train_valid_datasets_provider, model_provider,
     timers('model and optimizer').start()
     model, optimizer, lr_scheduler = setup_model_and_optimizer(model_provider)
     timers('model and optimizer').stop()
-    print_rank_0(f"iteration loaded {args.iteration}")
 
     # If pretrained checkpoint is provided and we have not trained for
     # any iteration (i.e., iteration is zero), then load the pretrained
