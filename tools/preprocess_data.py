@@ -126,7 +126,7 @@ def get_args():
                        help='Number of worker processes to launch')
     group.add_argument('--doc-of-workers', type=int, default=25,
                        help='Number of document per worker to processes')
-    group.add_argument('--log-interval', type=int, default=100,
+    group.add_argument('--log-interval', type=int, default=10000,
                        help='Interval between progress updates')
     args = parser.parse_args()
     args.keep_empty = False
@@ -206,20 +206,22 @@ def main():
     proc_start = time.time()
     total_bytes_processed = 0
     print("Time to startup:", startup_end - startup_start)
-
+    log_cnt = 0
     for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
         total_bytes_processed += bytes_processed
         for key, sentences in doc.items():
             for sentence in sentences:
                 builders[key].add_item(torch.IntTensor(sentence))
             builders[key].end_document()
+        log_cnt += 1
         if i % args.log_interval == 0:
             current = time.time()
             elapsed = current - proc_start
             mbs = total_bytes_processed/elapsed/1024/1024
             print(f"Processed {i} documents",
-                  f"({i/elapsed} docs/s, {mbs} MB/s).",
+                  f"({log_cnt/elapsed} docs/s, {mbs} MB/s).",
                   file=sys.stderr)
+            log_cnt = 0
             proc_start = time.time()
             total_bytes_processed = 0
 

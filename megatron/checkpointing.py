@@ -202,7 +202,6 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', deepspeed=F
     iteration, release, success = get_checkpoint_iteration(args)
     if not success:
         return 0
-    print_rank_0(f"iteration loaded {iteration}")
 
     if args.deepspeed:
 

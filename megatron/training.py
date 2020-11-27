@@ -215,7 +215,7 @@ def setup_model_and_optimizer(model_provider_func):
     optimizer = get_optimizer(model)
     lr_scheduler = get_learning_rate_scheduler(optimizer)
 
-    if args.load is not None:
+    if args.load is not None and not args.finetuning:
         args.iteration = load_checkpoint(model, optimizer, lr_scheduler)
     else:
         args.iteration = 0
