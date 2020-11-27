@@ -118,9 +118,9 @@ def _build_train_valid_dataloaders(train_dataset, valid_dataset):
     # shuffling so we can just use a simple infinite loop.
     valid_dataloader_ = build_data_loader(valid_dataset, args.batch_size,
                                           args.num_workers, not args.keep_last)
-    valid_dataloader = _build_infinite_size_dataloader(valid_dataloader_)
+    # valid_dataloader = _build_infinite_size_dataloader(valid_dataloader_)
 
-    return train_dataloader, valid_dataloader
+    return train_dataloader, valid_dataloader_
 
 
 def _train(model, optimizer, lr_scheduler, forward_step,
