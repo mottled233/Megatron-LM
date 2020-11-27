@@ -16,6 +16,7 @@
 """Finetune utilities."""
 
 import torch
+from torch.utils.data import DataLoader, SequentialSampler
 
 from megatron import get_args
 from megatron import print_rank_0
@@ -116,11 +117,11 @@ def _build_train_valid_dataloaders(train_dataset, valid_dataset):
     args.train_iters = args.epochs * args.train_iters_per_epoch
     # Validation dataset. For this dataset, we do not need to set up
     # shuffling so we can just use a simple infinite loop.
-    valid_dataloader_ = build_data_loader(valid_dataset, args.batch_size,
-                                          args.num_workers, not args.keep_last)
+    test_sampler = SequentialSampler(valid_dataset)
+    test_dataloader = DataLoader(valid_dataset, sampler=test_sampler, batch_size=args.batch_size)
     # valid_dataloader = _build_infinite_size_dataloader(valid_dataloader_)
 
-    return train_dataloader, valid_dataloader_
+    return train_dataloader, test_dataloader
 
 
 def _train(model, optimizer, lr_scheduler, forward_step,
