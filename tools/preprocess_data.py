@@ -113,7 +113,10 @@ def get_args():
                        help='Path to the BPE merge file (if necessary).')
     group.add_argument('--append-eod', action='store_true',
                        help='Append an <eod> token to the end of a document.')
-
+    group.add_argument('--cache-dir', type=str, default=None,
+                       help='Cache the tokenized doc in case the corpus too big to load into memory.')
+    group.add_argument('--cache-size', type=int, default=100000,
+                       help='Number of document per cache file store')
 
     group = parser.add_argument_group(title='output data')
     group.add_argument('--output-prefix', type=str, required=True,
@@ -142,48 +145,96 @@ def get_args():
 
     return args
 
+
+def cache_docs(docs, cache_dir):
+    if not os.path.exists(os.path.join(cache_dir, "count")):
+        postfix = "0"
+    else:
+        with open(os.path.join(cache_dir, "count"), "r") as cnt:
+            postfix = cnt.read()
+
+    with open(os.path.join(cache_dir, f"doc_{postfix}"), 'w') as f:
+        json.dump({"docs": docs}, f)
+
+    with open(os.path.join(cache_dir, "count"), "r") as cnt:
+        cnt.write(f"{int(postfix) + 1}")
+
+
+def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
+    if cache_dir and not filename:
+        with open(os.path.join(cache_dir, "count"), "r") as cnt:
+            postfix = cnt.read()
+        for i in range(int(postfix)):
+            with open(os.path.join(cache_dir, f"doc_{i}")) as f:
+                docs = json.load(f)
+            for doc in docs:
+                yield doc
+    elif cache_dir and filename:
+        with open(os.path.join(cache_dir, filename)) as f:
+            docs = json.load(f)
+        for doc in docs:
+            yield doc
+    else:
+        for doc in encoded_docs:
+            yield doc
+
+
 def main():
     args = get_args()
     startup_start = time.time()
-
-    # print("Opening", args.input)
-    # fin = open(args.input, 'r', encoding='utf-8')
-    print("setup...")
-    # if nltk_available and args.split_sentences:
-    #     nltk.download("punkt", download_dir="./", quiet=True)
-
-    encoder = Encoder(args)
+    #
+    # # print("Opening", args.input)
+    # # fin = open(args.input, 'r', encoding='utf-8')
+    # print("setup...")
+    # # if nltk_available and args.split_sentences:
+    # #     nltk.download("punkt", download_dir="./", quiet=True)
+    #
+    # encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
-    print("initializing process pool...")
-    pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
-    encoded_docs = []
-    inputs = args.input.split("@")
-
-    buff_size = args.doc_of_workers * args.workers
-    buff_docs = []
-    buff_file_num = 0
-    proc_start = time.time()
-    for input_dir in inputs:
-        for parent, dirnames, filenames in os.walk(input_dir):
-            for filename in filenames:
-                current = os.path.join(parent, filename)
-                print("Opening", current)
-                fin = open(current, 'r', encoding='utf-8')
-                buff_docs.extend(fin.readlines())
-                fin.close()
-                buff_file_num += 1
-
-                if len(buff_docs) >= buff_size:
-                    encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
-                    time_per_file = (time.time()-proc_start)/buff_file_num
-                    print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
-                    proc_start = time.time()
-                    buff_file_num = 0
-                    buff_docs = []
-    pool.close()
+    # print("initializing process pool...")
+    # pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
+    # encoded_docs = []
+    # inputs = args.input.split("@")
+    #
+    # buff_size = args.doc_of_workers * args.workers
+    # buff_docs = []
+    # buff_file_num = 0
+    # proc_start = time.time()
+    # for input_dir in inputs:
+    #     for parent, dirnames, filenames in os.walk(input_dir):
+    #         for filename in filenames:
+    #             current = os.path.join(parent, filename)
+    #             print("Opening", current)
+    #             fin = open(current, 'r', encoding='utf-8')
+    #             buff_docs.extend(fin.readlines())
+    #             fin.close()
+    #             buff_file_num += 1
+    #
+    #             if len(buff_docs) >= buff_size:
+    #                 encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
+    #                 time_per_file = (time.time()-proc_start)/buff_file_num
+    #                 print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
+    #
+    #                 if args.cache_dir and len(encoded_docs) >= args.cache_size:
+    #                     cache_docs(encoded_docs, args.cache_dir)
+    #                     encoded_docs = []
+    #                 proc_start = time.time()
+    #                 buff_file_num = 0
+    #                 buff_docs = []
+    #
+    # if buff_docs:
+    #     encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
+    #     time_per_file = (time.time() - proc_start) / buff_file_num
+    #     print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
+    #
+    #     if args.cache_dir and len(encoded_docs) >= args.cache_size:
+    #         cache_docs(encoded_docs, args.cache_dir)
+    #         encoded_docs = []
+    #
+    # pool.close()
     # encoded_docs = pool.imap(encoder.encode, fin, 25)
     #encoded_docs = map(encoder.encode, fin)
-
+    encoded_docs = []
     level = "document"
     if args.split_sentences:
         level = "sentence"
@@ -207,7 +258,7 @@ def main():
     total_bytes_processed = 0
     print("Time to startup:", startup_end - startup_start)
     log_cnt = 0
-    for i, (doc, bytes_processed) in enumerate(encoded_docs, start=1):
+    for i, (doc, bytes_processed) in enumerate(encode_doc_generator(encoded_docs, args.cache_dir), start=1):
         total_bytes_processed += bytes_processed
         for key, sentences in doc.items():
             for sentence in sentences:
