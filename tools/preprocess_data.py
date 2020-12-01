@@ -226,7 +226,7 @@ def main():
         encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
         time_per_file = (time.time() - proc_start) / buff_file_num
         print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
-
+        print(encoded_docs[0])
         if args.cache_dir:
             cache_docs(encoded_docs, args.cache_dir)
             encoded_docs = []
