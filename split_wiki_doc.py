@@ -73,7 +73,8 @@ def process_wiki(filename, parent_dir, args, splitter):
         if sub_file != "":
             json_data = {args.json_key: sub_file}
             buff.append(json.dumps(json_data, ensure_ascii=False))
-
+    if not os.path.isdir(os.path.join(args.output_dir, dir_par)):
+        os.mkdir(os.path.join(args.output_dir, dir_par))
     with open(os.path.join(args.output_dir, dir_par, f"{filename}.json"), 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
 
