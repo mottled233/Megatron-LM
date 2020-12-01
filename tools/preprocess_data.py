@@ -156,7 +156,7 @@ def cache_docs(docs, cache_dir):
     with open(os.path.join(cache_dir, f"doc_{postfix}"), 'w') as f:
         json.dump({"docs": docs}, f)
 
-    with open(os.path.join(cache_dir, "count"), "r") as cnt:
+    with open(os.path.join(cache_dir, "count"), "w") as cnt:
         cnt.write(f"{int(postfix) + 1}")
 
 
