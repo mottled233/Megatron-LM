@@ -210,7 +210,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', deepspeed=F
 
     if args.deepspeed:
 
-        if args.finetuning:
+        if args.finetune:
             load_path = model._get_ckpt_name(load_dir, iteration)
 
             if not os.path.exists(load_path):
