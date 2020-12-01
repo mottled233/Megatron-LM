@@ -232,7 +232,6 @@ def main():
             encoded_docs = []
 
     pool.close()
-    encoded_docs = []
     level = "document"
     if args.split_sentences:
         level = "sentence"
