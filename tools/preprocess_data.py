@@ -168,15 +168,15 @@ def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
             with open(os.path.join(cache_dir, f"doc_{i}")) as f:
                 docs = json.load(f)
             for doc in docs:
-                yield doc
+                yield doc[0], doc[1]
     elif cache_dir and filename:
         with open(os.path.join(cache_dir, filename)) as f:
             docs = json.load(f)
         for doc in docs:
-            yield doc
+            yield doc[0], doc[1]
     else:
         for doc in encoded_docs:
-            yield doc
+            yield doc[0], doc[1]
 
 
 def main():
