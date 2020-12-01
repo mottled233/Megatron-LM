@@ -43,11 +43,8 @@ def para_splitter(text):
     return filter(no_blank, text.split("\n"))
 
 
-def process_wiki(filename, parent_dir, args, splitter):
+def process_wiki(filename, parent_dir, args, splitter, dir_par):
     current = os.path.join(parent_dir, filename)
-    dir_par = parent_dir.split("/")[-1]
-    if dir_par == "":
-        dir_par = parent_dir.split("/")[-2]
     buff = []
     with open(current, 'r', encoding='utf-8') as f1:
         lines = f1.readlines()
@@ -73,8 +70,6 @@ def process_wiki(filename, parent_dir, args, splitter):
         if sub_file != "":
             json_data = {args.json_key: sub_file}
             buff.append(json.dumps(json_data, ensure_ascii=False))
-    if not os.path.isdir(os.path.join(args.output_dir, dir_par)):
-        os.mkdir(os.path.join(args.output_dir, dir_par))
     with open(os.path.join(args.output_dir, dir_par, f"{filename}.json"), 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
 
@@ -99,7 +94,13 @@ def main():
         pool = multiprocessing.Pool(args.num_of_workers)
 
     for parent, dirnames, filenames in tqdm(os.walk(args.input)):
-        parser = partial(process_wiki, parent_dir=parent, args=args, splitter=splitter)
+        dir_par = parent.split("/")[-1]
+        if dir_par == "":
+            dir_par = parent.split("/")[-2]
+        if not os.path.isdir(os.path.join(args.output_dir, dir_par)):
+            os.mkdir(os.path.join(args.output_dir, dir_par))
+
+        parser = partial(process_wiki, parent_dir=parent, args=args, splitter=splitter, dir_par=dir_par)
         if args.num_of_workers > 1:
             for _ in tqdm(pool.imap(parser, filenames)):
                 pass
