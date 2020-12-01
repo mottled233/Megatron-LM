@@ -224,7 +224,7 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', deepspeed=F
 
             model.load_module_state_dict(state_dict=checkpoint['module'],
                                          strict=True)
-            checkpoint_name, state_dict = None, {}
+            checkpoint_name, state_dict = "finetuning", {}
         else:
             checkpoint_name, state_dict = model.load_checkpoint(load_dir, iteration)
 
