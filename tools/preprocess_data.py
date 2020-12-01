@@ -189,51 +189,49 @@ def main():
     # # if nltk_available and args.split_sentences:
     # #     nltk.download("punkt", download_dir="./", quiet=True)
     #
-    # encoder = Encoder(args)
+    encoder = Encoder(args)
     tokenizer = build_tokenizer(args)
-    # print("initializing process pool...")
-    # pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
-    # encoded_docs = []
-    # inputs = args.input.split("@")
-    #
-    # buff_size = args.doc_of_workers * args.workers
-    # buff_docs = []
-    # buff_file_num = 0
-    # proc_start = time.time()
-    # for input_dir in inputs:
-    #     for parent, dirnames, filenames in os.walk(input_dir):
-    #         for filename in filenames:
-    #             current = os.path.join(parent, filename)
-    #             print("Opening", current)
-    #             fin = open(current, 'r', encoding='utf-8')
-    #             buff_docs.extend(fin.readlines())
-    #             fin.close()
-    #             buff_file_num += 1
-    #
-    #             if len(buff_docs) >= buff_size:
-    #                 encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
-    #                 time_per_file = (time.time()-proc_start)/buff_file_num
-    #                 print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
-    #
-    #                 if args.cache_dir and len(encoded_docs) >= args.cache_size:
-    #                     cache_docs(encoded_docs, args.cache_dir)
-    #                     encoded_docs = []
-    #                 proc_start = time.time()
-    #                 buff_file_num = 0
-    #                 buff_docs = []
-    #
-    # if buff_docs:
-    #     encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
-    #     time_per_file = (time.time() - proc_start) / buff_file_num
-    #     print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
-    #
-    #     if args.cache_dir and len(encoded_docs) >= args.cache_size:
-    #         cache_docs(encoded_docs, args.cache_dir)
-    #         encoded_docs = []
-    #
-    # pool.close()
-    # encoded_docs = pool.imap(encoder.encode, fin, 25)
-    #encoded_docs = map(encoder.encode, fin)
+    print("initializing process pool...")
+    pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
+    encoded_docs = []
+    inputs = args.input.split("@")
+
+    buff_size = args.doc_of_workers * args.workers
+    buff_docs = []
+    buff_file_num = 0
+    proc_start = time.time()
+    for input_dir in inputs:
+        for parent, dirnames, filenames in os.walk(input_dir):
+            for filename in filenames:
+                current = os.path.join(parent, filename)
+                print("Opening", current)
+                fin = open(current, 'r', encoding='utf-8')
+                buff_docs.extend(fin.readlines())
+                fin.close()
+                buff_file_num += 1
+
+                if len(buff_docs) >= buff_size:
+                    encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
+                    time_per_file = (time.time()-proc_start)/buff_file_num
+                    print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
+
+                    if args.cache_dir and len(encoded_docs) >= args.cache_size:
+                        cache_docs(encoded_docs, args.cache_dir)
+                        encoded_docs = []
+                    proc_start = time.time()
+                    buff_file_num = 0
+                    buff_docs = []
+
+    if buff_docs:
+        encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
+        time_per_file = (time.time() - proc_start) / buff_file_num
+        print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
+
+        if args.cache_dir and len(encoded_docs) >= args.cache_size:
+            cache_docs(encoded_docs, args.cache_dir)
+            encoded_docs = []
+
+    pool.close()
     encoded_docs = []
     level = "document"
     if args.split_sentences:

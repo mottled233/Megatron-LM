@@ -1,6 +1,6 @@
 import json
 import os
-import time
+import re
 import argparse
 from tqdm import tqdm
 import nltk
@@ -18,27 +18,87 @@ def parse_args():
     group.add_argument('--output-dir', type=str, required=True,
                        help='Path to output wiki corpus')
     group.add_argument('--json-key', type=str, default="text")
-    group.add_argument('--max-seq-len', type=int, default=500)
-    group.add_argument('--num-of-workers', type=int, default=1)
+    group.add_argument('--num_of_workers', type=int, default=1)
 
-    group.add_argument('--split-by', type=str, default="sentence",
-                       choices=['sentence', 'paragraph'])
-    group.add_argument('--keep-last', action="store_true",
-                       help="Keep the last sub-doc of document. It will be short than max-seq-len.")
 
     args = parser.parse_args()
     return args
 
 
-def process_wiki(filename, parent_dir, args, splitter, dir_par):
+code_pattern = [" = ", ".(", "();", " + ", " - ", "=\"", "http", "://", ".html", ".com"]
+image_header = ["[graph", "(Image", "(Photo"]
+
+
+def code_line_filter(line):
+    match_cnt = 0
+    for pattern in code_pattern:
+        match_cnt += 0 if line.find(pattern) == -1 else 1
+    if match_cnt >= 2:
+        return False
+    return True
+
+
+def filter_lines(line):
+    if re.match(r"^\s*$", line):
+        return False
+    line_len = len(whitespace_tokenize(line))
+    if line_len <= 5 and line.startswith("Advertise"):
+        return False
+
+    for header in image_header:
+        if line.startswith(header):
+            return False
+
+    if not code_line_filter(line):
+        return False
+
+
+def read_open_web_doc(file_lines):
+    docs = []
+    lines = []
+    for line in file_lines:
+        # Head of a document.
+        header_match = re.search(r"\d{5,}-[\d\w]{10,}\.txt\s+(\d+ )+\s+(ustar)*.+?(\d+ )+", line)
+        if header_match:
+            st, ed = header_match.span()
+
+            if st != 0:
+                lines.append(line[:st].strip())
+
+            docs.append(lines)
+            lines = []
+
+            if ed != len(line):
+                lines.append(line[ed:].strip())
+
+        if not re.match("^\s*$", line):
+            lines.append(line)
+    return docs
+
+
+def list_in_doc(doc_lines):
+    short_cnt = 0
+    for line in doc_lines:
+        if len(whitespace_tokenize(line)) <= 10:
+            short_cnt += 1
+            if short_cnt > 10:
+                return True
+        else:
+            short_cnt = 0
+    return True
+
+
+def process_doc(filename, parent_dir, args, splitter):
     current = os.path.join(parent_dir, filename)
     buff = []
     with open(current, 'r', encoding='utf-8') as f1:
         lines = f1.readlines()
 
-    for json_line in lines:
-        doc = json.loads(json_line)
-        doc_text = doc[args.json_key]
+    docs = read_open_web_doc(lines)
+
+    for doc in docs:
+        filter_doc(doc)
+        doc_text = "\n".join(doc)
         doc_lines = splitter(doc_text)
         if args.split_by == "paragraph":
             doc_lines = [doc_line + "\n" for doc_line in doc_lines]
@@ -54,7 +114,7 @@ def process_wiki(filename, parent_dir, args, splitter, dir_par):
                 buff.append(json.dumps(json_data, ensure_ascii=False))
                 sub_file = ""
                 wd_count = 0
-        if sub_file != "" and args.keep_last:
+        if sub_file != "":
             json_data = {args.json_key: sub_file}
             buff.append(json.dumps(json_data, ensure_ascii=False))
     with open(os.path.join(args.output_dir, dir_par, f"{filename}.json"), 'w', encoding='utf-8') as out_f:
@@ -98,3 +158,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
