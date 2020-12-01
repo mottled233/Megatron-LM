@@ -174,12 +174,16 @@ def _train(model, optimizer, lr_scheduler, forward_step,
                 losses_dict, skipped_iter = train_step(forward_step, batch, model,
                                                        optimizer, lr_scheduler)
             iteration += 1
+            # Logging.
+            loss_scale = None
+            if args.fp16:
+                loss_scale = optimizer.cur_scale if args.deepspeed else optimizer.loss_scale
 
             # Logging.
             if args.deepspeed:
                 report_memory_flag = ds_training_log(losses_dict, losses_dict_sum,
                                                      optimizer.param_groups[0]['lr'],
-                                                     iteration, optimizer.loss_scale,
+                                                     iteration, loss_scale,
                                                      report_memory_flag, skipped_iter=skipped_iter)
             else:
                 report_memory_flag = training_log(losses_dict, losses_dict_sum,
