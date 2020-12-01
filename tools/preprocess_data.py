@@ -227,7 +227,7 @@ def main():
         time_per_file = (time.time() - proc_start) / buff_file_num
         print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
 
-        if args.cache_dir and len(encoded_docs) >= args.cache_size:
+        if args.cache_dir:
             cache_docs(encoded_docs, args.cache_dir)
             encoded_docs = []
 
