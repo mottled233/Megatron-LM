@@ -173,7 +173,7 @@ def get_optimizer(model):
         betas=(args.adam_beta1, args.adam_beta2), eps=args.adam_eps)
 
     # Wrap into fp16 optimizer.
-    if args.fp16:
+    if not args.deepspeed and args.fp16:
         optimizer = FP16_Optimizer(optimizer,
                                    static_loss_scale=args.loss_scale,
                                    dynamic_loss_scale=args.dynamic_loss_scale,
