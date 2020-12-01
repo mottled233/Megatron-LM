@@ -28,6 +28,11 @@ from megatron.training import evaluate_and_print_results
 from megatron.training import setup_model_and_optimizer
 from megatron.training import train_step
 from megatron.training import training_log
+
+from megatron.ds_training import (evaluate_and_print_results as ds_evaluate_and_print_results,
+                                  setup_model_and_optimizer as ds_setup_model_and_optimizer,
+                                  train_step as ds_train_step,
+                                  training_log as ds_training_log)
 from megatron.utils import check_adlr_autoresume_termination
 from megatron.utils import reduce_losses
 
@@ -118,7 +123,7 @@ def _build_train_valid_dataloaders(train_dataset, valid_dataset):
     # Validation dataset. For this dataset, we do not need to set up
     # shuffling so we can just use a simple infinite loop.
     test_sampler = SequentialSampler(valid_dataset)
-    test_dataloader = DataLoader(valid_dataset, sampler=test_sampler, batch_size=args.batch_size)
+    test_dataloader = DataLoader(valid_dataset, sampler=test_sampler, shuffle=True, batch_size=args.batch_size)
     # valid_dataloader = _build_infinite_size_dataloader(valid_dataloader_)
 
     return train_dataloader, test_dataloader
@@ -162,15 +167,25 @@ def _train(model, optimizer, lr_scheduler, forward_step,
             start_iteration = 0
 
             # Train for one step.
-            losses_dict, skipped_iter = train_step(forward_step, batch, model,
-                                        optimizer, lr_scheduler)
+            if args.deepspeed:
+                losses_dict, skipped_iter = ds_train_step(forward_step, batch, model,
+                                                          optimizer, lr_scheduler)
+            else:
+                losses_dict, skipped_iter = train_step(forward_step, batch, model,
+                                                       optimizer, lr_scheduler)
             iteration += 1
 
             # Logging.
-            report_memory_flag = training_log(losses_dict, losses_dict_sum,
-                                              optimizer.param_groups[0]['lr'],
-                                              iteration, optimizer.loss_scale,
-                                              report_memory_flag, skipped_iter=skipped_iter)
+            if args.deepspeed:
+                report_memory_flag = ds_training_log(losses_dict, losses_dict_sum,
+                                                     optimizer.param_groups[0]['lr'],
+                                                     iteration, optimizer.loss_scale,
+                                                     report_memory_flag, skipped_iter=skipped_iter)
+            else:
+                report_memory_flag = training_log(losses_dict, losses_dict_sum,
+                                                  optimizer.param_groups[0]['lr'],
+                                                  iteration, optimizer.loss_scale,
+                                                  report_memory_flag, skipped_iter=skipped_iter)
 
             # Autoresume
             if args.adlr_autoresume and \
@@ -222,6 +237,8 @@ def finetune(train_valid_datasets_provider, model_provider,
 
     if evaluate_callback_provider is not None:
         evaluate_func = evaluate_callback_provider()
+    elif args.deepspeed:
+        evaluate_func = ds_evaluate_and_print_results
     else:
         evaluate_func = evaluate_and_print_results
     timers('callback function').stop()
@@ -229,7 +246,10 @@ def finetune(train_valid_datasets_provider, model_provider,
 
     # Build model, optimizer and learning rate scheduler.
     timers('model and optimizer').start()
-    model, optimizer, lr_scheduler = setup_model_and_optimizer(model_provider)
+    if args.deepspeed:
+        model, optimizer, lr_scheduler = ds_setup_model_and_optimizer(model_provider)
+    else:
+        model, optimizer, lr_scheduler = setup_model_and_optimizer(model_provider)
     timers('model and optimizer').stop()
 
     # If pretrained checkpoint is provided and we have not trained for
