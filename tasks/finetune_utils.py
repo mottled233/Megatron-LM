@@ -123,7 +123,7 @@ def _build_train_valid_dataloaders(train_dataset, valid_dataset):
     # Validation dataset. For this dataset, we do not need to set up
     # shuffling so we can just use a simple infinite loop.
     test_sampler = SequentialSampler(valid_dataset)
-    test_dataloader = DataLoader(valid_dataset, sampler=test_sampler, shuffle=True, batch_size=args.batch_size)
+    test_dataloader = DataLoader(valid_dataset, sampler=test_sampler, batch_size=args.batch_size)
     # valid_dataloader = _build_infinite_size_dataloader(valid_dataloader_)
 
     return train_dataloader, test_dataloader
