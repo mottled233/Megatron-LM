@@ -267,7 +267,7 @@ def finetune(train_valid_datasets_provider, model_provider,
         args.load = original_load
         # This is critical when only model is loaded. We should make sure
         # master parameters are also updated.
-        if args.fp16:
+        if args.fp16 and not args.deepspeed:
             optimizer._model_params_to_master_params()
     timers('pretrained checkpoint').stop()
 
