@@ -72,6 +72,8 @@ def ensure_directory_exists(filename):
 def get_checkpoint_name(checkpoints_path, iteration,
                         release=False, mp_rank=None, deepspeed=False):
     """A unified checkpoint name."""
+    if checkpoints_path.endswith(".pt"):
+        return checkpoints_path
     if release:
         directory = 'release'
     elif deepspeed:
@@ -168,6 +170,9 @@ def save_checkpoint(iteration, model, optimizer, lr_scheduler):
 
 def get_checkpoint_iteration(args):
     # Read the tracker file and set the iteration.
+    if args.load.endswith(".pt"):
+        return 0, False, True
+
     tracker_filename = get_checkpoint_tracker_filename(args.load)
     if not os.path.isfile(tracker_filename):
         print_rank_0('WARNING: could not find the metadata file {} '.format(
