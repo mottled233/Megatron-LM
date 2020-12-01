@@ -59,7 +59,7 @@ bert_options="${bert_options}
 "
 
 
-run_cmd="deepspeed --num_nodes ${NUM_WORKERS} --num_gpus ${NUM_GPUS_PER_WORKER} --hostfile=${hostfile} pretrain_bert.py $@ ${bert_options} &> ${JOB_NAME}.log"
+run_cmd="deepspeed --num_nodes ${NUM_WORKERS} --num_gpus ${NUM_GPUS_PER_WORKER} --hostfile=${hostfile} tasks/squad_main.py $@ ${bert_options} &> ${JOB_NAME}.log"
 echo ${run_cmd}
 eval ${run_cmd}
 
