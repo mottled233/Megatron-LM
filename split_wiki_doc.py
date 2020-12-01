@@ -45,6 +45,9 @@ def para_splitter(text):
 
 def process_wiki(filename, parent_dir, args, splitter):
     current = os.path.join(parent_dir, filename)
+    dir_par = parent_dir.split("/")[-1]
+    if dir_par == "":
+        dir_par = parent_dir.split("/")[-2]
     buff = []
     with open(current, 'r', encoding='utf-8') as f1:
         lines = f1.readlines()
@@ -71,7 +74,7 @@ def process_wiki(filename, parent_dir, args, splitter):
             json_data = {args.json_key: sub_file}
             buff.append(json.dumps(json_data, ensure_ascii=False))
 
-    with open(f"{args.output_dir}/{filename}.json", 'w', encoding='utf-8') as out_f:
+    with open(os.path.join(args.output_dir, dir_par, f"{filename}.json"), 'w', encoding='utf-8') as out_f:
         out_f.write("\n".join(buff))
 
     return 1
