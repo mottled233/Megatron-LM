@@ -210,9 +210,23 @@ def load_checkpoint(model, optimizer, lr_scheduler, load_arg='load', deepspeed=F
 
     if args.deepspeed:
 
-        checkpoint_name, state_dict = model.load_checkpoint(args.load, iteration,
-                                                            load_optimizer_states=not args.finetune,
-                                                            load_lr_scheduler_states=not args.finetune)
+        if args.finetuning:
+            load_path = model._get_ckpt_name(load_dir, iteration)
+
+            if not os.path.exists(load_path):
+                print_rank_0(
+                    'Client provided checkpoint load path: {} does not exist ... skip checkpoint load'
+                        .format(load_path))
+                return None, None
+
+            print_rank_0(f'rank: {args.rank} loading checkpoint: {load_path}')
+            checkpoint = torch.load(load_path, map_location=lambda storage, loc: storage)
+
+            model.load_module_state_dict(state_dict=checkpoint['module'],
+                                         strict=True)
+            checkpoint_name, state_dict = None, {}
+        else:
+            checkpoint_name, state_dict = model.load_checkpoint(load_dir, iteration)
 
         if checkpoint_name is None:
             if mpu.get_data_parallel_rank() == 0:
