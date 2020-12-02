@@ -79,6 +79,10 @@ def pretrain(train_valid_test_dataset_provider, model_provider,
     # Model, optimizer, and learning rate.
     timers('model and optimizer').start()
     model, optimizer, lr_scheduler = setup_model_and_optimizer(model_provider)
+
+    if args.deepspeed and args.use_lamb:
+        lr_scheduler.optimizer = optimizer.optimizer
+
     timers('model and optimizer').stop()
 
     # Data stuff.
