@@ -82,6 +82,8 @@ class AnnealingLR(object):
         if step_num is None:
             step_num = self.num_iters + 1
         self.num_iters = step_num
+
+        print_rank_0(self.num_iters)
         new_lr = self.get_lr()
         if type(self.optimizer) == tuple:
             for group in self.optimizer:
