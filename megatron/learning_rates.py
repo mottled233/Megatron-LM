@@ -25,7 +25,7 @@ class AnnealingLR(object):
 
     def __init__(self, optimizer, start_lr,
                  warmup_iter, total_iters,
-                 decay_style, last_iter, min_lr=0.0,
+                 decay_style, last_iter, min_lr=0.0, warmup_style="linear", decay_iter=250,
                  use_checkpoint_lr_scheduler=True,
                  override_lr_scheduler=False):
 
@@ -34,10 +34,12 @@ class AnnealingLR(object):
         self.start_lr = start_lr
         self.min_lr = min_lr
         self.warmup_iter = warmup_iter
+        self.warmup_style = decay_style
         self.num_iters = last_iter
         self.end_iter = total_iters
         assert self.end_iter > 0
         self.decay_style = decay_style
+        self.decay_iter = decay_iter
         self.override_lr_scheduler = override_lr_scheduler
         self.use_checkpoint_lr_scheduler = use_checkpoint_lr_scheduler
         if self.override_lr_scheduler:
@@ -55,7 +57,10 @@ class AnnealingLR(object):
         num_iters_ = min(self.num_iters, self.end_iter - self.warmup_iter)
         # Warmup.
         if self.warmup_iter > 0 and self.num_iters <= self.warmup_iter:
-            return float(self.start_lr) * num_iters_ / self.warmup_iter
+            if self.warmup_style == "ee":
+                return self.start_lr * ((self.num_iters / self.warmup_iter) ** 2)
+            else:
+                return float(self.start_lr) * num_iters_ / self.warmup_iter
 
         num_iters_ = num_iters_ - self.warmup_iter
         if self.decay_style == 'linear':
@@ -66,6 +71,8 @@ class AnnealingLR(object):
         elif self.decay_style == 'exponential':
             # exp(-0.693) = 1/2
             lr = self.start_lr * math.exp(-0.693 * num_iters_ / self.end_iter)
+        elif self.decay_style == 'ee':
+            return self.start_lr * (0.9 ** ((self.num_iters - self.warmup_iter) / self.decay_iter))
         else:
             lr = self.start_lr
         return max(lr, self.min_lr)
@@ -88,9 +95,11 @@ class AnnealingLR(object):
             'start_lr': self.start_lr,
             'warmup_iter': self.warmup_iter,
             'num_iters': self.num_iters,
+            'warmup_style': self.warmup_style,
             'decay_style': self.decay_style,
             'end_iter': self.end_iter,
-            'min_lr': self.min_lr
+            'min_lr': self.min_lr,
+            'decay_iter': self.decay_iter
         }
         return state_dict
 
@@ -119,9 +128,12 @@ class AnnealingLR(object):
                                                'warmup iterations')
         self.end_iter = self._check_and_set(self.end_iter, sd['end_iter'],
                                             'total number of iterations')
+        self.warmup_style = self._check_and_set(self.warmup_style, sd['warmup_style'], 'warmup style')
+
         self.decay_style = self._check_and_set(self.decay_style,
                                                sd['decay_style'],
                                                'decay style')
+        self.decay_iter = self._check_and_set(self.decay_iter, sd['decay_iter'], 'decay iter')
 
         self.num_iters = sd['num_iters']
         self.step(self.num_iters)
