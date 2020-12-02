@@ -134,6 +134,6 @@ class AnnealingLR(object):
                                                sd['decay_style'],
                                                'decay style')
         self.decay_iter = self._check_and_set(self.decay_iter, sd['decay_iter'], 'decay iter')
-
+        print(sd)
         self.num_iters = sd['num_iters']
         self.step(self.num_iters)
