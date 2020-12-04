@@ -170,11 +170,11 @@ class BertModel(MegatronModule):
                                                            lm_labels)
             return lm_loss, binary_logits
 
-    # def state_dict(self, destination=None, prefix='', keep_vars=False):
-    #     if get_args().deepspeed:
-    #         return self.state_dict_for_save_checkpoint(destination, prefix, keep_vars)
-    #     else:
-    #         return super().state_dict(destination, prefix, keep_vars)
+    def state_dict(self, destination=None, prefix='', keep_vars=False):
+        if get_args().megatron_style:
+            return self.state_dict_for_save_checkpoint(destination, prefix, keep_vars)
+        else:
+            return super().state_dict(destination, prefix, keep_vars)
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
                                        keep_vars=False):
