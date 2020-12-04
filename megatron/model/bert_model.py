@@ -170,11 +170,11 @@ class BertModel(MegatronModule):
                                                            lm_labels)
             return lm_loss, binary_logits
 
-    def state_dict(self, destination=None, prefix='', keep_vars=False):
-        if get_args().deepspeed:
-            return self.state_dict_for_save_checkpoint(destination, prefix, keep_vars)
-        else:
-            return super().state_dict(destination, prefix, keep_vars)
+    # def state_dict(self, destination=None, prefix='', keep_vars=False):
+    #     if get_args().deepspeed:
+    #         return self.state_dict_for_save_checkpoint(destination, prefix, keep_vars)
+    #     else:
+    #         return super().state_dict(destination, prefix, keep_vars)
 
     def state_dict_for_save_checkpoint(self, destination=None, prefix='',
                                        keep_vars=False):
@@ -195,10 +195,13 @@ class BertModel(MegatronModule):
 
     def load_state_dict(self, state_dict, strict=True):
         """Customized load."""
-        self.language_model.load_state_dict(
-            state_dict[self._language_model_key], strict=strict)
-        self.lm_head.load_state_dict(
-            state_dict[self._lm_head_key], strict=strict)
-        if self.add_binary_head:
-            self.binary_head.load_state_dict(
-                state_dict[self._binary_head_key], strict=strict)
+        if get_args().megatron_style:
+            self.language_model.load_state_dict(
+                state_dict[self._language_model_key], strict=strict)
+            self.lm_head.load_state_dict(
+                state_dict[self._lm_head_key], strict=strict)
+            if self.add_binary_head:
+                self.binary_head.load_state_dict(
+                    state_dict[self._binary_head_key], strict=strict)
+        else:
+            super().load_state_dict(state_dict, strict=True)
