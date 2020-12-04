@@ -228,7 +228,7 @@ def setup_model_and_optimizer(model_provider_func):
     model = get_model(model_provider_func)
     optimizer = get_optimizer(model)
     lr_scheduler = get_learning_rate_scheduler(optimizer)
-
+    print_rank_0(type(model))
     if args.deepspeed:
         print_rank_0("DeepSpeed is enabled.")
         if args.use_lamb:
