@@ -331,6 +331,8 @@ def _add_checkpointing_args(parser):
 
     group.add_argument('--save', type=str, default=None,
                        help='Output directory to save checkpoints to.')
+    group.add_argument('--deepspeed-ckpt', action="store_true",
+                       help='Output directory to save checkpoints to.')
     group.add_argument('--save-interval', type=int, default=None,
                        help='Number of iterations between checkpoint saves.')
     group.add_argument('--no-save-optim', action='store_true',
