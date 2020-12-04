@@ -145,7 +145,7 @@ def get_model(model_provider_func):
     # Wrap model for distributed training."""
     if args.DDP_impl == 'torch':
         i = torch.cuda.current_device()
-        model = torchDDP(model, device_ids=[i], output_device=i,
+        model = torchDDP(model, device_ids=[i], output_device=i, bucket_cmp_mb=256,
                          process_group=mpu.get_data_parallel_group())
         return model
     if args.DDP_impl == 'local':
