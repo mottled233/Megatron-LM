@@ -143,9 +143,6 @@ def get_model(model_provider_func):
         model = FP16_Module(model)
 
     # Wrap model for distributed training."""
-    if args.deepspeed == 'deepspeed':
-        return model
-
     if args.DDP_impl == 'torch':
         i = torch.cuda.current_device()
         model = torchDDP(model, device_ids=[i], output_device=i,
