@@ -149,14 +149,17 @@ class SQUAD(MegatronModule):
         return state_dict_
 
     def load_state_dict(self, state_dict, strict=True):
-        """Customized load."""
+        if get_args().megatron_style:
+            """Customized load."""
 
-        self.language_model.load_state_dict(
-            state_dict[self._language_model_key], strict=strict)
-        if self._perdiction_layer_key in state_dict:
-            self.prediction.load_state_dict(
-                state_dict[self._perdiction_layer_key], strict=strict)
+            self.language_model.load_state_dict(
+                state_dict[self._language_model_key], strict=strict)
+            if self._perdiction_layer_key in state_dict:
+                self.prediction.load_state_dict(
+                    state_dict[self._perdiction_layer_key], strict=strict)
+            else:
+                print_rank_0('***WARNING*** could not find {} in the checkpoint, '
+                             'initializing to random'.format(
+                                 self._perdiction_layer_key))
         else:
-            print_rank_0('***WARNING*** could not find {} in the checkpoint, '
-                         'initializing to random'.format(
-                             self._perdiction_layer_key))
+            super().load_state_dict(state_dict, strict=True)
