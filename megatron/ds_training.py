@@ -255,6 +255,8 @@ def setup_model_and_optimizer(model_provider_func):
     else:
         args.iteration = 0
 
+    args.iteration = 0 if args.finetune else args.iteration
+
     return model, optimizer, lr_scheduler
 
 
