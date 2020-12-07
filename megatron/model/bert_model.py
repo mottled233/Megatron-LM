@@ -204,4 +204,5 @@ class BertModel(MegatronModule):
                 self.binary_head.load_state_dict(
                     state_dict[self._binary_head_key], strict=strict)
         else:
+            print_rank_0(f"in bert load_state_dict, strict={strict}")
             super().load_state_dict(state_dict, strict=True)
