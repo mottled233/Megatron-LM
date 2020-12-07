@@ -162,4 +162,4 @@ class SQUAD(MegatronModule):
                              'initializing to random'.format(
                                  self._perdiction_layer_key))
         else:
-            super().load_state_dict(state_dict, strict=True)
+            super().load_state_dict(state_dict, strict=False)
