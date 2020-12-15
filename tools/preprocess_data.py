@@ -115,7 +115,7 @@ def get_args():
                        help='Append an <eod> token to the end of a document.')
     group.add_argument('--cache-dir', type=str, default=None,
                        help='Cache the tokenized doc in case the corpus too big to load into memory.')
-    group.add_argument('--cache-size', type=int, default=100000,
+    group.add_argument('--cache-size', type=int, default=1000000,
                        help='Number of document per cache file store')
 
     group = parser.add_argument_group(title='output data')
@@ -179,19 +179,9 @@ def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
             yield doc[0], doc[1]
 
 
-def main():
-    args = get_args()
-    startup_start = time.time()
-    #
-    # # print("Opening", args.input)
-    # # fin = open(args.input, 'r', encoding='utf-8')
-    # print("setup...")
-    # # if nltk_available and args.split_sentences:
-    # #     nltk.download("punkt", download_dir="./", quiet=True)
-    #
+def doc_encode(args, tokenizer):
     encoder = Encoder(args)
-    tokenizer = build_tokenizer(args)
-    print("initializing process pool...")
+    startup_start = time.time()
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
     encoded_docs = []
     inputs = args.input.split("@")
@@ -217,9 +207,11 @@ def main():
 
                     if args.cache_dir and len(encoded_docs) >= args.cache_size:
                         cache_docs(encoded_docs, args.cache_dir)
+                        del encoded_docs
                         encoded_docs = []
                     proc_start = time.time()
                     buff_file_num = 0
+                    del buff_docs
                     buff_docs = []
 
     if buff_docs:
@@ -227,11 +219,29 @@ def main():
         time_per_file = (time.time() - proc_start) / buff_file_num
         print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
         print(encoded_docs[0])
-        if args.cache_dir:
-            cache_docs(encoded_docs, args.cache_dir)
-            encoded_docs = []
+    if args.cache_dir and len(encoded_docs) >= 0:
+        cache_docs(encoded_docs, args.cache_dir)
+        encoded_docs = []
 
     pool.close()
+    return encoded_docs
+
+
+def main():
+    args = get_args()
+    #
+    # # print("Opening", args.input)
+    # # fin = open(args.input, 'r', encoding='utf-8')
+    # print("setup...")
+    # # if nltk_available and args.split_sentences:
+    # #     nltk.download("punkt", download_dir="./", quiet=True)
+    #
+
+    tokenizer = build_tokenizer(args)
+    print("initializing process pool...")
+
+    encoded_docs = doc_encode(args, tokenizer)
+
     level = "document"
     if args.split_sentences:
         level = "sentence"
@@ -250,10 +260,8 @@ def main():
                                                impl=args.dataset_impl,
                                                vocab_size=tokenizer.vocab_size)
 
-    startup_end = time.time()
     proc_start = time.time()
     total_bytes_processed = 0
-    print("Time to startup:", startup_end - startup_start)
     log_cnt = 0
     for i, (doc, bytes_processed) in enumerate(encode_doc_generator(encoded_docs, args.cache_dir), start=1):
         total_bytes_processed += bytes_processed
@@ -275,6 +283,7 @@ def main():
 
     for key in args.json_keys:
         builders[key].finalize(output_idx_files[key])
+
 
 if __name__ == '__main__':
     main()
