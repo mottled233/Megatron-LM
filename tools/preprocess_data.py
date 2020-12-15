@@ -222,6 +222,7 @@ def doc_encode(args, tokenizer):
         print(encoded_docs[0])
     if args.cache_dir and len(encoded_docs) >= 0:
         cache_docs(encoded_docs, args.cache_dir)
+        print(f"cached dir....")
         encoded_docs = []
 
     pool.close()
