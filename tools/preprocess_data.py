@@ -166,13 +166,12 @@ def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
             postfix = cnt.read()
         for i in range(int(postfix)):
             with open(os.path.join(cache_dir, f"doc_{i}")) as f:
-                docs = json.load(f)
+                docs = json.load(f)["docs"]
             for doc in docs:
-                print(docs)
                 yield doc[0], int(doc[1])
     elif cache_dir and filename:
         with open(os.path.join(cache_dir, filename)) as f:
-            docs = json.load(f)
+            docs = json.load(f)["docs"]
         for doc in docs:
             yield doc[0], int(doc[1])
     else:
