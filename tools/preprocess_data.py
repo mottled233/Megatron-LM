@@ -187,6 +187,7 @@ def doc_encode(args, tokenizer):
     inputs = args.input.split("@")
 
     buff_size = args.doc_of_workers * args.workers
+    total_doc_num = 0
     buff_docs = []
     buff_file_num = 0
     proc_start = time.time()
@@ -203,7 +204,8 @@ def doc_encode(args, tokenizer):
                 if len(buff_docs) >= buff_size:
                     encoded_docs.extend(pool.imap(encoder.encode, buff_docs, args.doc_of_workers))
                     time_per_file = (time.time()-proc_start)/buff_file_num
-                    print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
+                    total_doc_num += len(buff_docs)
+                    print(f"Finished {buff_file_num} files, total {total_doc_num} docs, use time per file:{time_per_file}")
 
                     if args.cache_dir and len(encoded_docs) >= args.cache_size:
                         cache_docs(encoded_docs, args.cache_dir)
