@@ -244,7 +244,7 @@ def main():
     tokenizer = build_tokenizer(args)
     print("initializing process pool...")
 
-    encoded_docs = doc_encode(args, tokenizer)
+    encoded_docs = []  # doc_encode(args, tokenizer)
 
     level = "document"
     if args.split_sentences:
