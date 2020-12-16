@@ -237,7 +237,6 @@ def doc_encode(args, tokenizer):
                     if args.cache_dir and len(encoded_docs) >= args.cache_size:
                         threads.append(cache_docs_asyn(encoded_docs, args.cache_dir))
                         print(f"cached dir....")
-                        del encoded_docs
                         encoded_docs = []
                     proc_start = time.time()
                     buff_file_num = 0
