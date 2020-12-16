@@ -271,7 +271,7 @@ def database_init(args, tokenizer, local_lock):
                                                                                                    key, file_id))
         output_idx_files[f"{key}_{file_id}"] = os.path.join(args.output_dir, "{}_{}_{}.idx".format(args.output_name_prefix,
                                                                                                    key, file_id))
-        builders[f"{key}_{file_id}"] = indexed_dataset.make_builder(output_bin_files[key],
+        builders[f"{key}_{file_id}"] = indexed_dataset.make_builder(output_bin_files[f"{key}_{file_id}"],
                                                                     impl=args.dataset_impl,
                                                                     vocab_size=tokenizer.vocab_size)
 
