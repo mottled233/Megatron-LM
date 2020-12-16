@@ -210,6 +210,8 @@ def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
 def doc_encode(args, tokenizer):
     encoder = Encoder(args)
     startup_start = time.time()
+
+    print("initializing process pool...")
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
     encoded_docs = []
     inputs = args.input.split("@")
@@ -299,7 +301,6 @@ def main():
     #
 
     tokenizer = build_tokenizer(args)
-    print("initializing process pool...")
 
     if not args.skip_encode:
         encoded_docs = doc_encode(args, tokenizer)
@@ -313,7 +314,7 @@ def main():
 
     # Cache file level parallel
     cache_cnt = get_dir_cnt(args.cache_dir)
-    cache_files = [f"doc_{cache_id}" for cache_id in range(1, cache_cnt + 1)]
+    cache_files = [f"doc_{cache_id}" for cache_id in range(cache_cnt)]
 
     dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys)
 
