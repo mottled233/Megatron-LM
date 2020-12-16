@@ -237,8 +237,7 @@ def doc_encode(args, tokenizer):
                     print(f"Finished {buff_file_num} files, total {total_doc_num} docs, use time per file:{time_per_file}")
 
                     if args.cache_dir and len(encoded_docs) >= args.cache_size:
-                        # threads.append(cache_docs_asyn(encoded_docs, args.cache_dir))
-                        cache_docs(encoded_docs, args.cache_dir)
+                        threads.append(cache_docs_asyn(encoded_docs, args.cache_dir))
                         print(f"cached dir....")
                         encoded_docs = []
                     proc_start = time.time()
@@ -252,7 +251,7 @@ def doc_encode(args, tokenizer):
         print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
         print(encoded_docs[0])
     if args.cache_dir and len(encoded_docs) >= 0:
-        cache_docs(encoded_docs, args.cache_dir)
+        threads.append(cache_docs_asyn(encoded_docs, args.cache_dir))
         print(f"cached dir....")
         encoded_docs = []
 
