@@ -164,8 +164,11 @@ def get_dir_cnt(dir_path):
     return postfix
 
 
-def add_dir_cnt(dir_path, cnt=1):
-    postfix = get_dir_cnt(dir_path)
+def add_dir_cnt(dir_path, cnt=1, start=None):
+    if start is None:
+        postfix = get_dir_cnt(dir_path)
+    else:
+        postfix = start
     with open(os.path.join(dir_path, "count"), "w") as cnt_file:
         cnt_file.write(f"{postfix + cnt}")
 
@@ -179,10 +182,9 @@ def cache_docs_asyn(docs, cache_dir):
 def cache_docs(docs, cache_dir):
     postfix = get_dir_cnt(cache_dir)
 
+    add_dir_cnt(cache_dir, start=postfix)
     with open(os.path.join(cache_dir, f"doc_{postfix}"), 'w') as f:
         json.dump({"docs": docs}, f)
-
-    add_dir_cnt(cache_dir)
 
 
 def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
