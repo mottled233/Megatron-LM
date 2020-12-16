@@ -296,6 +296,9 @@ def main():
     tokenizer = build_tokenizer(args)
 
     if not args.skip_encode:
+        if os.path.exists(args.cache_dir):
+            os.rmdir(args.cache_dir)
+        os.mkdir(args.cache_dir)
         encoded_docs = doc_encode(args, tokenizer)
 
     # level = "document"
