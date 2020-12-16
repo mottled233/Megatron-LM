@@ -24,6 +24,7 @@ import sys
 from functools import partial
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir)))
+import threading
 import time
 
 import torch
@@ -169,6 +170,12 @@ def add_dir_cnt(dir_path, cnt=1):
         cnt_file.write(f"{postfix + cnt}")
 
 
+def cache_docs_asyn(docs, cache_dir):
+    thread = threading.Thread(target=cache_docs, args=(docs, cache_dir))
+    thread.start()
+    return thread
+
+
 def cache_docs(docs, cache_dir):
     postfix = get_dir_cnt(cache_dir)
 
@@ -199,6 +206,7 @@ def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
 def doc_encode(args, tokenizer):
     encoder = Encoder(args)
     startup_start = time.time()
+    threads = []
 
     print("initializing process pool...")
     pool = multiprocessing.Pool(args.workers, initializer=encoder.initializer)
@@ -227,7 +235,7 @@ def doc_encode(args, tokenizer):
                     print(f"Finished {buff_file_num} files, total {total_doc_num} docs, use time per file:{time_per_file}")
 
                     if args.cache_dir and len(encoded_docs) >= args.cache_size:
-                        cache_docs(encoded_docs, args.cache_dir)
+                        threads.append(cache_docs_asyn(encoded_docs, args.cache_dir))
                         print(f"cached dir....")
                         del encoded_docs
                         encoded_docs = []
@@ -242,11 +250,13 @@ def doc_encode(args, tokenizer):
         print(f"Finished {buff_file_num} files , use time per file:{time_per_file}")
         print(encoded_docs[0])
     if args.cache_dir and len(encoded_docs) >= 0:
-        cache_docs(encoded_docs, args.cache_dir)
+        threads.append(cache_docs_asyn(encoded_docs, args.cache_dir))
         print(f"cached dir....")
         encoded_docs = []
 
     pool.close()
+    for thread in threads:
+        thread.join()
     return encoded_docs
 
 
