@@ -19,6 +19,7 @@ import argparse
 import json
 import multiprocessing
 import os
+import shutil
 import sys
 from functools import partial
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
@@ -297,7 +298,7 @@ def main():
 
     if not args.skip_encode:
         if os.path.exists(args.cache_dir):
-            os.rmdir(args.cache_dir)
+            shutil.rmtree(args.cache_dir)
         os.mkdir(args.cache_dir)
         encoded_docs = doc_encode(args, tokenizer)
 
