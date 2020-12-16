@@ -20,6 +20,7 @@ import json
 import multiprocessing
 import os
 import sys
+from functools import partial
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),
                                              os.path.pardir)))
 import time
@@ -33,6 +34,7 @@ except ImportError:
 
 from megatron.tokenizer import build_tokenizer
 from megatron.data import indexed_dataset
+from tqdm import tqdm
 
 
 # https://stackoverflow.com/questions/33139531/preserve-empty-lines-with-nltks-punkt-tokenizer
@@ -119,8 +121,10 @@ def get_args():
                        help='Number of document per cache file store')
 
     group = parser.add_argument_group(title='output data')
-    group.add_argument('--output-prefix', type=str, required=True,
-                       help='Path to binary output file without suffix')
+    group.add_argument('--output-dir', type=str, required=True,
+                       help='Path to binary output file')
+    group.add_argument('--output-name-prefix', type=str, required=True,
+                       help='Filename of binary output file without suffix and path')
     group.add_argument('--dataset-impl', type=str, default='mmap',
                        choices=['lazy', 'cached', 'mmap'])
 
@@ -146,25 +150,47 @@ def get_args():
     return args
 
 
-def cache_docs(docs, cache_dir):
-    if not os.path.exists(os.path.join(cache_dir, "count")):
-        postfix = "0"
+def get_dir_cnt(dir_path):
+    global lock
+    if lock is not None:
+        lock.acquire()
+
+    if not os.path.exists(os.path.join(dir_path, "count")):
+        postfix = 0
     else:
-        with open(os.path.join(cache_dir, "count"), "r") as cnt:
-            postfix = cnt.read()
+        with open(os.path.join(dir_path, "count"), "r") as cnt:
+            postfix = int(cnt.read())
+
+    if lock is not None:
+        lock.release()
+
+    return postfix
+
+
+def add_dir_cnt(dir_path, cnt=1):
+    global lock
+    if lock is not None:
+        lock.acquire()
+    postfix = get_dir_cnt(dir_path)
+    with open(os.path.join(dir_path, "count"), "w") as cnt_file:
+        cnt_file.write(f"{postfix + cnt}")
+    if lock is not None:
+        lock.release()
+
+
+def cache_docs(docs, cache_dir):
+    postfix = get_dir_cnt(cache_dir)
 
     with open(os.path.join(cache_dir, f"doc_{postfix}"), 'w') as f:
         json.dump({"docs": docs}, f)
 
-    with open(os.path.join(cache_dir, "count"), "w") as cnt:
-        cnt.write(f"{int(postfix) + 1}")
+    add_dir_cnt(cache_dir)
 
 
 def encode_doc_generator(encoded_docs, cache_dir=None, filename=None):
     if cache_dir and not filename:
-        with open(os.path.join(cache_dir, "count"), "r") as cnt:
-            postfix = cnt.read()
-        for i in range(int(postfix)):
+        postfix = get_dir_cnt(cache_dir)
+        for i in range(postfix):
             with open(os.path.join(cache_dir, f"doc_{i}")) as f:
                 docs = json.load(f)["docs"]
             for doc in docs:
@@ -231,6 +257,35 @@ def doc_encode(args, tokenizer):
     return encoded_docs
 
 
+def database_init(args, tokenizer, local_lock):
+    global lock, builders, output_idx_files, output_bin_files, file_id
+    lock = local_lock
+    builders = {}
+    output_bin_files = {}
+    output_idx_files = {}
+    file_id = get_dir_cnt(args.output_dir)
+    for key in args.json_keys:
+        output_bin_files[f"{key}_{file_id}"] = os.path.join(args.output_dir, "{}_{}_{}.bin".format(args.output_name_prefix,
+                                                                                                   key, file_id))
+        output_idx_files[f"{key}_{file_id}"] = os.path.join(args.output_dir, "{}_{}_{}.idx".format(args.output_name_prefix,
+                                                                                                   key, file_id))
+        builders[f"{key}_{file_id}"] = indexed_dataset.make_builder(output_bin_files[key],
+                                                                    impl=args.dataset_impl,
+                                                                    vocab_size=tokenizer.vocab_size)
+
+
+def parallel_dataset_builder(cache_file, cache_dir, json_keys=("text", )):
+    global builders, output_idx_files, file_id
+    for doc, bytes_processed in encode_doc_generator([], cache_dir, cache_file):
+        for key, sentences in doc.items():
+            for sentence in sentences:
+                builders[f"{key}_{file_id}"].add_item(torch.IntTensor(sentence))
+            builders[f"{key}_{file_id}"].end_document()
+    for key in json_keys:
+        builders[f"{key}_{file_id}"].finalize(output_idx_files[f"{key}_{file_id}"])
+    return 1
+
+
 def main():
     args = get_args()
     #
@@ -244,50 +299,71 @@ def main():
     tokenizer = build_tokenizer(args)
     print("initializing process pool...")
 
-    encoded_docs = []  # doc_encode(args, tokenizer)
+    encoded_docs = doc_encode(args, tokenizer)
 
-    level = "document"
-    if args.split_sentences:
-        level = "sentence"
+    # level = "document"
+    # if args.split_sentences:
+    #     level = "sentence"
 
     print(f"Vocab size: {tokenizer.vocab_size}")
-    print(f"Output prefix: {args.output_prefix}")
-    output_bin_files = {}
-    output_idx_files = {}
-    builders = {}
-    for key in args.json_keys:
-        output_bin_files[key] = "{}_{}_{}.bin".format(args.output_prefix,
-                                                      key, level)
-        output_idx_files[key] = "{}_{}_{}.idx".format(args.output_prefix,
-                                                      key, level)
-        builders[key] = indexed_dataset.make_builder(output_bin_files[key],
-                                               impl=args.dataset_impl,
-                                               vocab_size=tokenizer.vocab_size)
+    print(f"Output prefix: {os.path.join(args.output_dir, args.output_name_prefix)}")
 
-    proc_start = time.time()
-    total_bytes_processed = 0
-    log_cnt = 0
-    for i, (doc, bytes_processed) in enumerate(encode_doc_generator(encoded_docs, args.cache_dir), start=1):
-        total_bytes_processed += bytes_processed
-        for key, sentences in doc.items():
-            for sentence in sentences:
-                builders[key].add_item(torch.IntTensor(sentence))
-            builders[key].end_document()
-        log_cnt += 1
-        if i % args.log_interval == 0:
-            current = time.time()
-            elapsed = current - proc_start
-            mbs = total_bytes_processed/elapsed/1024/1024
-            print(f"Processed {i} documents",
-                  f"({log_cnt/elapsed} docs/s, {mbs} MB/s).",
-                  file=sys.stderr)
-            log_cnt = 0
-            proc_start = time.time()
-            total_bytes_processed = 0
+    # Cache file level parallel
+    cache_cnt = get_dir_cnt(args.cache_dir)
+    cache_files = [f"doc_{cache_id}" for cache_id in range(1, cache_cnt + 1)]
+    global_lock = multiprocessing.Lock()
+    pool = multiprocessing.Pool(processes=args.args.workers, initializer=database_init, initargs=(args,
+                                                                                                  tokenizer,
+                                                                                                  global_lock))
+    dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys)
 
-    for key in args.json_keys:
-        builders[key].finalize(output_idx_files[key])
+    for _ in tqdm(pool.imap(dataset_builder, cache_files)):
+        pass
+
+    print("Finished data preprocess.")
+
+
+    # output_bin_files = {}
+    # output_idx_files = {}
+    # builders = {}
+    # for key in args.json_keys:
+    #     output_bin_files[key] = "{}_{}_{}.bin".format(args.output_name_prefix,
+    #                                                   key, level)
+    #     output_idx_files[key] = "{}_{}_{}.idx".format(args.output_prefix,
+    #                                                   key, level)
+    #     builders[key] = indexed_dataset.make_builder(output_bin_files[key],
+    #                                            impl=args.dataset_impl,
+    #                                            vocab_size=tokenizer.vocab_size)
+    #
+    # proc_start = time.time()
+    # total_bytes_processed = 0
+    # log_cnt = 0
+    # for i, (doc, bytes_processed) in enumerate(encode_doc_generator(encoded_docs, args.cache_dir), start=1):
+    #     total_bytes_processed += bytes_processed
+    #     for key, sentences in doc.items():
+    #         for sentence in sentences:
+    #             builders[key].add_item(torch.IntTensor(sentence))
+    #         builders[key].end_document()
+    #     log_cnt += 1
+    #     if i % args.log_interval == 0:
+    #         current = time.time()
+    #         elapsed = current - proc_start
+    #         mbs = total_bytes_processed/elapsed/1024/1024
+    #         print(f"Processed {i} documents",
+    #               f"({log_cnt/elapsed} docs/s, {mbs} MB/s).",
+    #               file=sys.stderr)
+    #         log_cnt = 0
+    #         proc_start = time.time()
+    #         total_bytes_processed = 0
+    #
+    # for key in args.json_keys:
+    #     builders[key].finalize(output_idx_files[key])
 
 
 if __name__ == '__main__':
+    lock = None
+    builders = None
+    file_id = None
+    output_bin_files = None
+    output_idx_files = None
     main()
