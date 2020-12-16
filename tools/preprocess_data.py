@@ -101,6 +101,8 @@ def get_args():
                        help='space separate listed of keys to extract from json')
     group.add_argument('--split-sentences', action='store_true',
                        help='Split documents into sentences.')
+    group.add_argument('--skip-encode', action='store_true',
+                       help='Skip the encode stage and use cache file instead.')
     group.add_argument('--keep-newlines', action='store_true',
                        help='Keep newlines between sentences when splitting.')
 
@@ -299,7 +301,8 @@ def main():
     tokenizer = build_tokenizer(args)
     print("initializing process pool...")
 
-    encoded_docs = doc_encode(args, tokenizer)
+    if not args.skip_encode:
+        encoded_docs = doc_encode(args, tokenizer)
 
     # level = "document"
     # if args.split_sentences:
