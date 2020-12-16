@@ -153,31 +153,19 @@ def get_args():
 
 
 def get_dir_cnt(dir_path):
-    global lock
-    if lock is not None:
-        lock.acquire()
-
     if not os.path.exists(os.path.join(dir_path, "count")):
         postfix = 0
     else:
         with open(os.path.join(dir_path, "count"), "r") as cnt:
             postfix = int(cnt.read())
 
-    if lock is not None:
-        lock.release()
-
     return postfix
 
 
 def add_dir_cnt(dir_path, cnt=1):
-    global lock
-    if lock is not None:
-        lock.acquire()
     postfix = get_dir_cnt(dir_path)
     with open(os.path.join(dir_path, "count"), "w") as cnt_file:
         cnt_file.write(f"{postfix + cnt}")
-    if lock is not None:
-        lock.release()
 
 
 def cache_docs(docs, cache_dir):
@@ -267,7 +255,12 @@ def database_init(args, tokenizer, local_lock):
     builders = {}
     output_bin_files = {}
     output_idx_files = {}
+
+    lock.acquire()
     file_id = get_dir_cnt(args.output_dir)
+    add_dir_cnt(args.output_dir)
+    lock.release()
+
     for key in args.json_keys:
         output_bin_files[f"{key}_{file_id}"] = os.path.join(args.output_dir, "{}_{}_{}.bin".format(args.output_name_prefix,
                                                                                                    key, file_id))
