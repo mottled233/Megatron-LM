@@ -314,14 +314,22 @@ def main():
     # Cache file level parallel
     cache_cnt = get_dir_cnt(args.cache_dir)
     cache_files = [f"doc_{cache_id}" for cache_id in range(1, cache_cnt + 1)]
-    global_lock = multiprocessing.Lock()
-    pool = multiprocessing.Pool(processes=args.args.workers, initializer=database_init, initargs=(args,
-                                                                                                  tokenizer,
-                                                                                                  global_lock))
+
     dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys)
 
-    for _ in tqdm(pool.imap(dataset_builder, cache_files)):
-        pass
+    if args.workers > 1:
+        global_lock = multiprocessing.Lock()
+        pool = multiprocessing.Pool(processes=args.args.workers, initializer=database_init, initargs=(args,
+                                                                                                      tokenizer,
+                                                                                                      global_lock))
+
+        for _ in tqdm(pool.imap(dataset_builder, cache_files)):
+            pass
+
+    else:
+        database_init(args, tokenizer, None)
+        for file in tqdm(cache_files):
+            dataset_builder(file)
 
     print("Finished data preprocess.")
 
