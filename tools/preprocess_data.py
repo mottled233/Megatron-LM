@@ -325,6 +325,29 @@ def main():
         for file in tqdm(cache_files):
             dataset_builder(file)
 
+
+    # Merge files
+    out_cnt = get_dir_cnt(args.output_dir)
+
+    for key in args.json_keys:
+        key_idx_file = os.path.join(args.output_dir, "{}_{}.idx".format(args.output_name_prefix, key))
+        key_bin_file = os.path.join(args.output_dir, "{}_{}.bin".format(args.output_name_prefix, key))
+
+        idx_files = [os.path.join(args.output_dir, "{}_{}_{}".format(args.output_name_prefix,
+                                                            key, out_id)) for out_id in range(out_cnt)]
+
+        builder = indexed_dataset.make_builder(key_bin_file,
+                                               impl=args.dataset_impl,
+                                               vocab_size=tokenizer.vocab_size)
+
+        print(f"Start merging {out_cnt} files ...")
+        for idx_file in tqdm(idx_files):
+            builder.merge_file_(idx_file)
+
+        builder.finalize(key_idx_file)
+
+        print(f"Finished.")
+
     print("Finished data preprocess.")
 
 
