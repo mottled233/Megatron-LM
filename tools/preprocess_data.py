@@ -319,7 +319,7 @@ def main():
 
     if args.workers > 1:
         global_lock = multiprocessing.Lock()
-        pool = multiprocessing.Pool(processes=args.args.workers, initializer=database_init, initargs=(args,
+        pool = multiprocessing.Pool(processes=args.workers, initializer=database_init, initargs=(args,
                                                                                                       tokenizer,
                                                                                                       global_lock))
 
