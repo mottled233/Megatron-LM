@@ -366,7 +366,7 @@ def main():
         print(f"Start merging {out_cnt} files ...")
         for idx_file in tqdm(idx_files):
             builder.merge_file_(idx_file)
-
+        print(f"Finalizing db files ...")
         start_finalize = time.time()
         builder.finalize(key_idx_file)
         print(f"Finished. Elapse: {time.time() - start_finalize}")
