@@ -266,7 +266,7 @@ def database_init(local_lock):
     lock = local_lock
 
 
-def parallel_dataset_builder(args, tokenizer, cache_file, cache_dir, json_keys=("text", )):
+def parallel_dataset_builder(cache_file, cache_dir, args, tokenizer, json_keys=("text", )):
     global lock
     builders = {}
     output_bin_files = {}
