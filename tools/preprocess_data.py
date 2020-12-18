@@ -94,6 +94,7 @@ class Encoder(object):
             ids[key] = doc_ids
         return ids, len(json_line)
 
+
 def get_args():
     parser = argparse.ArgumentParser()
     group = parser.add_argument_group(title='input data')
@@ -105,6 +106,9 @@ def get_args():
                        help='Split documents into sentences.')
     group.add_argument('--skip-encode', action='store_true',
                        help='Skip the encode stage and use cache file instead.')
+    group.add_argument('--skip-trans-db', action='store_true',
+                       help='Skip the transform stage and use db file instead.')
+
     group.add_argument('--keep-newlines', action='store_true',
                        help='Keep newlines between sentences when splitting.')
 
@@ -322,27 +326,28 @@ def main():
     # if args.split_sentences:
     #     level = "sentence"
 
-    print(f"Vocab size: {tokenizer.vocab_size}")
-    print(f"Output prefix: {os.path.join(args.output_dir, args.output_name_prefix)}")
+    if not args.skip_trans_db:
+        print(f"Vocab size: {tokenizer.vocab_size}")
+        print(f"Output prefix: {os.path.join(args.output_dir, args.output_name_prefix)}")
 
-    # Cache file level parallel
-    cache_cnt = get_dir_cnt(args.cache_dir)
-    cache_files = [f"doc_{cache_id}" for cache_id in range(cache_cnt)]
+        # Cache file level parallel
+        cache_cnt = get_dir_cnt(args.cache_dir)
+        cache_files = [f"doc_{cache_id}" for cache_id in range(cache_cnt)]
 
-    dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys,
-                              args=args, tokenizer=tokenizer)
+        dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys,
+                                  args=args, tokenizer=tokenizer)
 
-    if args.workers > 1:
-        global_lock = multiprocessing.Lock()
-        pool = multiprocessing.Pool(processes=min(args.workers, cache_cnt), initializer=database_init, initargs=(global_lock, ))
+        if args.workers > 1:
+            global_lock = multiprocessing.Lock()
+            pool = multiprocessing.Pool(processes=min(args.workers, cache_cnt), initializer=database_init, initargs=(global_lock, ))
 
-        for _ in tqdm(pool.imap(dataset_builder, cache_files)):
-            pass
+            for _ in tqdm(pool.imap(dataset_builder, cache_files)):
+                pass
 
-    else:
-        database_init(None)
-        for file in tqdm(cache_files):
-            dataset_builder(file)
+        else:
+            database_init(None)
+            for file in tqdm(cache_files):
+                dataset_builder(file)
 
     # Merge files
     out_cnt = get_dir_cnt(args.output_dir)
