@@ -559,6 +559,10 @@ class MMapIndexedDatasetBuilder(object):
         for size in index.sizes:
             self._sizes.append(size)
 
+        offset = self._doc_idx[-1]
+        for doc_id in index.doc_idx[1:]:
+            self._doc_idx.append(doc_id + offset)
+
         # Concatenate data
         with open(data_file_path(another_file), 'rb') as f:
             shutil.copyfileobj(f, self._data_file)
@@ -568,3 +572,4 @@ class MMapIndexedDatasetBuilder(object):
 
         with MMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
             index.write(self._sizes, self._doc_idx)
+
