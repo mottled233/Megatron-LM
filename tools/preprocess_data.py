@@ -261,17 +261,25 @@ def doc_encode(args, tokenizer):
     return encoded_docs
 
 
-def database_init(args, tokenizer, local_lock):
-    global lock, builders, output_idx_files, output_bin_files, file_id
+def database_init(local_lock):
+    global lock
     lock = local_lock
+
+
+def parallel_dataset_builder(args, tokenizer, cache_file, cache_dir, json_keys=("text", )):
+    global lock
     builders = {}
     output_bin_files = {}
     output_idx_files = {}
 
-    lock.acquire()
+    if lock is not None:
+        lock.acquire()
+
     file_id = get_dir_cnt(args.output_dir)
     add_dir_cnt(args.output_dir)
-    lock.release()
+
+    if lock is not None:
+        lock.release()
 
     for key in args.json_keys:
         output_bin_files[f"{key}_{file_id}"] = os.path.join(args.output_dir, "{}_{}_{}.bin".format(args.output_name_prefix,
@@ -282,9 +290,6 @@ def database_init(args, tokenizer, local_lock):
                                                                     impl=args.dataset_impl,
                                                                     vocab_size=tokenizer.vocab_size)
 
-
-def parallel_dataset_builder(cache_file, cache_dir, json_keys=("text", )):
-    global builders, output_idx_files, file_id
     for doc, bytes_processed in encode_doc_generator([], cache_dir, cache_file):
         for key, sentences in doc.items():
             for sentence in sentences:
@@ -324,19 +329,18 @@ def main():
     cache_cnt = get_dir_cnt(args.cache_dir)
     cache_files = [f"doc_{cache_id}" for cache_id in range(cache_cnt)]
 
-    dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys)
+    dataset_builder = partial(parallel_dataset_builder, cache_dir=args.cache_dir, json_keys=args.json_keys,
+                              args=args, tokenizer=tokenizer)
 
     if args.workers > 1:
         global_lock = multiprocessing.Lock()
-        pool = multiprocessing.Pool(processes=min(args.workers, cache_cnt), initializer=database_init, initargs=(args,
-                                                                                                      tokenizer,
-                                                                                                      global_lock))
+        pool = multiprocessing.Pool(processes=min(args.workers, cache_cnt), initializer=database_init, initargs=(global_lock, ))
 
         for _ in tqdm(pool.imap(dataset_builder, cache_files)):
             pass
 
     else:
-        database_init(args, tokenizer, None)
+        database_init(None)
         for file in tqdm(cache_files):
             dataset_builder(file)
 
@@ -404,8 +408,8 @@ def main():
 
 if __name__ == '__main__':
     lock = None
-    builders = None
-    file_id = None
-    output_bin_files = None
-    output_idx_files = None
+    # builders = None
+    # file_id = None
+    # output_bin_files = None
+    # output_idx_files = None
     main()
