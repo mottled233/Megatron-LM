@@ -36,6 +36,7 @@ def get_args():
 
     args = parser.parse_args()
     args.rank = 0
+    args.vocab_file = "bert-vocab.txt"
 
     return args
 
