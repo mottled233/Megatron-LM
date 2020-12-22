@@ -35,6 +35,7 @@ def get_args():
                        help='Prefix to binary output file')
 
     args = parser.parse_args()
+    args.rank = 0
 
     return args
 
