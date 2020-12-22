@@ -46,7 +46,7 @@ def main():
     tokenizer = build_tokenizer(args)
 
     prefixes = args.input.split("@")
-    assert(len(prefixes) >= 2, "Need at least two index file to merge.")
+    assert len(prefixes) >= 2, "Need at least two index file to merge."
 
     output_idx_file = f"{args.output}.idx"
     output_bin_file = f"{args.output}.bin"
