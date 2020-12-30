@@ -37,6 +37,7 @@ def get_args():
     args = parser.parse_args()
     args.rank = 0
     args.vocab_file = "bert-vocab.txt"
+    args.tokenizer_type = "BertWordPieceLowerCase"
 
     return args
 
@@ -53,13 +54,13 @@ def main():
     output_idx_file = f"{args.output}.idx"
     output_bin_file = f"{args.output}.bin"
 
-    builder = indexed_dataset.make_builder(output_idx_file, impl=args.dataset_impl, vocab_size=tokenizer.vocab_size)
+    builder = indexed_dataset.make_builder(output_bin_file, impl=args.dataset_impl, vocab_size=tokenizer.vocab_size)
 
     for data_path in tqdm(prefixes):
         builder.merge_file_(another_file=data_path)
 
     print("Finished merge, start to finalize.")
-    builder.finalize()
+    builder.finalize(output_idx_file)
     print("Finished.")
 
 
