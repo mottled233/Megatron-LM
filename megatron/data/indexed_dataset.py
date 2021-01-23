@@ -17,6 +17,7 @@ import struct
 from itertools import accumulate
 
 import numpy as np
+from tqdm import tqdm
 import torch
 from megatron import print_rank_0
 
@@ -354,7 +355,7 @@ class MMapIndexedDataset(torch.utils.data.Dataset):
                     address = 0
                     pointers = []
 
-                    for size in sizes:
+                    for size in tqdm(sizes):
                         pointers.append(address)
                         address += size * dtype_size
 
