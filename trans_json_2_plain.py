@@ -47,7 +47,7 @@ def main():
             i += 1
             if i % 10000 == 0 or i >= len(docs):
                 f.write("".join(buff))
-                buff = ""
+                buff = []
 
 
 if __name__ == "__main__":
