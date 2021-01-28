@@ -32,14 +32,22 @@ def main():
     docs = []
 
     for parent, dirnames, filenames in tqdm(os.walk(args.input)):
-        for filename in filenames:
+        print("enter " + parent)
+        for filename in tqdm(filenames):
             with open(os.path.join(parent, filename), 'r', encoding='utf-8') as f1:
                 for json_line in f1:
                     text = json.loads(json_line)[args.json_key].replace('\n', '')
                     docs.append(text)
+
+    print("Starting write")
+    buff = []
     with open(os.path.join(args.output), 'w', encoding='utf-8') as f:
-        for doc in docs:
-            f.write(doc + "\n\n")
+        for i, doc in tqdm(enumerate(docs)):
+            buff.append(doc + "\n\n")
+            i += 1
+            if i % 10000 == 0 or i >= len(docs):
+                f.write("".join(buff))
+                buff = ""
 
 
 if __name__ == "__main__":
