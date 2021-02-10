@@ -119,7 +119,7 @@ def process_book(filename, parent_dir, args, splitter):
     for line in file:
         sub_file += line
         wd_count += len(whitespace_tokenize(line))
-        if wd_count >= args.max_seq_len:
+        if wd_count >= args.max_seq_len != -1:
             if filter_doc(doc=sub_file, args=args, lang=already_check_lang):
                 json_data = {args.json_key: sub_file}
                 buff.append(json.dumps(json_data, ensure_ascii=False))
