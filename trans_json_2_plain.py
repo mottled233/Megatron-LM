@@ -64,13 +64,13 @@ def main():
                 docs.extend(parse_file(filename, parent, args, splitter))
         else:
             parse_file_func = partial(parse_file, parent=parent, args=args, splitter=splitter)
-            for file_doc_list in tqdm(pool.imap(parse_file_func, filenames)):
+            for file_doc_list in tqdm(pool.imap(parse_file_func, filenames), total=len(filenames)):
                 docs.extend(file_doc_list)
 
     print("Starting write")
     buff = []
     with open(os.path.join(args.output), 'w', encoding='utf-8') as f:
-        for i, doc in tqdm(enumerate(docs)):
+        for i, doc in tqdm(enumerate(docs), total=len(docs)):
             buff.append(doc + "\n\n")
             i += 1
             if i % 10000 == 0 or i >= len(docs):
