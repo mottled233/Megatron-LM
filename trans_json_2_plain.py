@@ -21,15 +21,30 @@ def parse_args():
     group.add_argument('--json-key', type=str, default="text")
     group.add_argument('--split-by', type=str, default="sentence",
                        choices=['sentence', 'paragraph'])
+    group.add_argument('--workers', type=int, default=1)
     args = parser.parse_args()
     return args
+
+
+def parse_file(file_name, parent, args, splitter):
+    docs = []
+    with open(os.path.join(parent, file_name), 'r', encoding='utf-8') as f1:
+        for json_line in f1:
+            text = json.loads(json_line)[args.json_key]
+            if args.split_by == "paragraph":
+                text = re.sub("\n+", "\n", text)
+            else:
+                text = text.replace("\n", "")
+                text = "\n".join(splitter(text))
+            docs.append(text)
+    return docs
 
 
 def main():
     args = parse_args()
 
-    # if args.num_of_workers > 1:
-    #     pool = multiprocessing.Pool(args.num_of_workers)
+    if args.workers > 1:
+        pool = multiprocessing.Pool(args.workers)
 
     docs = []
 
@@ -44,16 +59,12 @@ def main():
 
     for parent, dirnames, filenames in tqdm(os.walk(args.input)):
         print("enter " + parent)
-        for filename in tqdm(filenames):
-            with open(os.path.join(parent, filename), 'r', encoding='utf-8') as f1:
-                for json_line in f1:
-                    text = json.loads(json_line)[args.json_key]
-                    if args.split_by == "paragraph":
-                        text = re.sub("\n+", "\n", text)
-                    else:
-                        text = text.replace("\n", "")
-                        text = "\n".join(splitter(text))
-                    docs.append(text + "\n\n")
+        if args.workers == 1:
+            for filename in tqdm(filenames):
+                docs.extend(parse_file(filename, parent, args, splitter))
+        else:
+            parse_file_func = partial(parse_file, parent=parent, args=args, splitter=splitter)
+            docs.extend(pool.imap(parse_file_func, filenames))
 
     print("Starting write")
     buff = []
