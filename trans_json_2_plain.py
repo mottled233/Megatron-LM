@@ -4,6 +4,7 @@ import time
 import argparse
 from tqdm import tqdm
 import nltk
+import re
 import multiprocessing
 from functools import partial
 from tools.preprocess_data import CustomLanguageVars
@@ -18,7 +19,8 @@ def parse_args():
     group.add_argument('--output', type=str, required=True,
                        help='Path to output wiki corpus')
     group.add_argument('--json-key', type=str, default="text")
-
+    group.add_argument('--split-by', type=str, default="sentence",
+                       choices=['sentence', 'paragraph'])
     args = parser.parse_args()
     return args
 
@@ -31,13 +33,27 @@ def main():
 
     docs = []
 
+    if args.split_by == "paragraph":
+        splitter = para_splitter
+    elif args.split_by == "sentence":
+        splitter = nltk.load("tokenizers/punkt/english.pickle")
+        # this prevents punkt from eating newlines after sentences
+        splitter = nltk.tokenize.punkt.PunktSentenceTokenizer(
+                    train_text=splitter._params,
+                    lang_vars=CustomLanguageVars()).tokenize
+
     for parent, dirnames, filenames in tqdm(os.walk(args.input)):
         print("enter " + parent)
         for filename in tqdm(filenames):
             with open(os.path.join(parent, filename), 'r', encoding='utf-8') as f1:
                 for json_line in f1:
-                    text = json.loads(json_line)[args.json_key].replace('\n', '')
-                    docs.append(text)
+                    text = json.loads(json_line)[args.json_key]
+                    if args.split_by == "paragraph":
+                        text = re.sub("\n+", "\n", text)
+                    else:
+                        text = text.replace("\n", "")
+                        text = "\n".join(splitter(text))
+                    docs.append(text + "\n\n")
 
     print("Starting write")
     buff = []
