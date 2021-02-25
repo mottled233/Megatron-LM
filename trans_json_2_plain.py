@@ -64,7 +64,8 @@ def main():
                 docs.extend(parse_file(filename, parent, args, splitter))
         else:
             parse_file_func = partial(parse_file, parent=parent, args=args, splitter=splitter)
-            docs.extend(pool.imap(parse_file_func, filenames))
+            for file_doc_list in tqdm(pool.imap(parse_file_func, filenames)):
+                docs.extend(file_doc_list)
 
     print("Starting write")
     buff = []
